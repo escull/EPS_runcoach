@@ -14,12 +14,12 @@ I'm a beginner with a bit of scripting experience. I'm building this by vibe cod
 - When I say "commit", commit with a clear, descriptive message.
 
 ## Tech stack
-- Python 3.12 from python.org (system Python, NOT uv-managed — we need its Tcl/Tk). Dependencies managed with uv (`uv add`, `uv run`). Never use pip directly.
+- Python 3.14 from python.org (system Python, NOT uv-managed — we need its Tcl/Tk). Dependencies managed with uv (`uv add`, `uv run`). Never use pip directly.
 - UI: tkinter + ttk, with a modern theme (sv-ttk or ttkbootstrap — to be decided in Phase 3).
 - Charts: matplotlib, embedded with FigureCanvasTkAgg + NavigationToolbar2Tk.
 - Maths: numpy; pandas where it genuinely simplifies time-series work.
 - Storage: SQLite via the built-in sqlite3 module. Database at data/eps_runcoach.db.
-- FIT parsing: fitdecode or Garmin's official FIT SDK for Python — choose one and justify it.
+- FIT parsing: fitdecode — pure-Python, simple API, easier to work with than Garmin's official FIT SDK for a beginner-driven project.
 - AI coach: behind a provider interface. First provider: Gemini via `google-genai` (free tier, Flash model). Key from `.env` via python-dotenv. Model name lives in settings, not code.
 - Tests: pytest, for core code.
 - Launch: `uv run python -m eps_runcoach`. Later packaged with PyInstaller.

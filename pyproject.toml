@@ -1,0 +1,27 @@
+[project]
+name = "eps-runcoach"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "escull_h", email = "edwinscull@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "fitdecode>=0.11.0",
+]
+
+[project.scripts]
+eps-runcoach = "eps_runcoach:main"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
