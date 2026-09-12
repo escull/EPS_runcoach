@@ -15,6 +15,7 @@ venv/
 *.egg-info/
 build/
 dist/
+dist_installer/
 
 # Editors / OS
 .vscode/
