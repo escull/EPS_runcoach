@@ -4,6 +4,7 @@ from eps_runcoach.ui_tk.formatting import (
     format_duration,
     format_hr,
     format_pace,
+    parse_mmss_to_seconds,
 )
 
 
@@ -44,3 +45,15 @@ def test_format_pace_handles_none_or_zero():
 def test_format_hr():
     assert format_hr(153) == "153 bpm"
     assert format_hr(None) == "-"
+
+
+def test_parse_mmss_to_seconds():
+    assert parse_mmss_to_seconds("25:00") == 1500.0
+    assert parse_mmss_to_seconds("1:02:05") == 3725.0
+
+
+def test_parse_mmss_to_seconds_rejects_invalid_input():
+    assert parse_mmss_to_seconds("not a time") is None
+    assert parse_mmss_to_seconds("25:99") is None
+    assert parse_mmss_to_seconds("25") is None
+    assert parse_mmss_to_seconds("") is None

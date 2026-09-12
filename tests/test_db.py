@@ -275,3 +275,12 @@ def test_get_all_niggles_with_dates_orders_newest_session_first(conn):
 
     assert [r["location"] for r in rows] == ["knee", "ankle"]
     assert rows[0]["session_start_time"] == "2026-06-01T00:00:00+00:00"
+
+
+def test_get_max_observed_heart_rate(conn):
+    assert db.get_max_observed_heart_rate(conn) is None
+
+    db.insert_session(conn, make_summary(max_heart_rate=160), file_hash="a", session_type="run")
+    db.insert_session(conn, make_summary(max_heart_rate=178), file_hash="b", session_type="run")
+
+    assert db.get_max_observed_heart_rate(conn) == 178

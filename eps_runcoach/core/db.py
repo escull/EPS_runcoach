@@ -204,6 +204,15 @@ def get_session(conn: sqlite3.Connection, session_id: int) -> sqlite3.Row | None
     return conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
 
 
+def get_max_observed_heart_rate(conn: sqlite3.Connection) -> int | None:
+    """Highest max_heart_rate recorded across all sessions - used to suggest
+    a starting value for the max heart rate setting, since Suunto FIT files
+    don't carry a separate stored physiological max HR.
+    """
+    row = conn.execute("SELECT MAX(max_heart_rate) AS value FROM sessions").fetchone()
+    return row["value"] if row else None
+
+
 def update_session_type(conn: sqlite3.Connection, session_id: int, session_type: str) -> None:
     conn.execute("UPDATE sessions SET session_type = ? WHERE id = ?", (session_type, session_id))
     conn.commit()

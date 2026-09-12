@@ -47,3 +47,21 @@ def format_hr(bpm: int | None) -> str:
     if bpm is None:
         return "-"
     return f"{bpm} bpm"
+
+
+def parse_mmss_to_seconds(text: str) -> float | None:
+    """Parse a "MM:SS" or "H:MM:SS" string (as typed for a goal time) into
+    seconds. None if the text isn't a valid time.
+    """
+    parts = text.strip().split(":")
+    if not 2 <= len(parts) <= 3 or not all(p.isdigit() for p in parts):
+        return None
+    parts_int = [int(p) for p in parts]
+    if len(parts_int) == 2:
+        minutes, seconds = parts_int
+        hours = 0
+    else:
+        hours, minutes, seconds = parts_int
+    if seconds >= 60 or minutes >= 60:
+        return None
+    return float(hours * 3600 + minutes * 60 + seconds)

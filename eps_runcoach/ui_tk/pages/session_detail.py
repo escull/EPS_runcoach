@@ -6,7 +6,9 @@ import ttkbootstrap as tb
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 from eps_runcoach.charts.session_charts import heart_rate_chart, pace_chart
-from eps_runcoach.core import db
+from eps_runcoach.core import db, metrics
+from eps_runcoach.core import settings as core_settings
+from eps_runcoach.core.fit_import import SAMPLE_INTERVAL_S
 from eps_runcoach.ui_tk.formatting import format_date, format_distance, format_duration, format_hr, format_pace
 from eps_runcoach.ui_tk.pages.how_did_it_go import HowDidItGoDialog
 
@@ -41,6 +43,7 @@ class SessionDetailWindow(tb.Toplevel):
         self._build_header(body, session)
         self._build_how_did_it_go_section(body)
         self._build_splits_table(body, splits)
+        self._build_zones_section(body, samples)
         self._build_charts(body, samples)
 
     def _build_header(self, parent: tb.Frame, session: sqlite3.Row) -> None:
@@ -140,6 +143,28 @@ class SessionDetailWindow(tb.Toplevel):
                 ),
             )
         tree.pack(fill="x", padx=16, pady=(0, 16))
+
+    def _build_zones_section(self, parent: tb.Frame, samples: list[sqlite3.Row]) -> None:
+        max_hr_raw = core_settings.get_setting(self.app.conn, core_settings.MAX_HEART_RATE_KEY)
+        resting_hr_raw = core_settings.get_setting(self.app.conn, core_settings.RESTING_HEART_RATE_KEY)
+        if not max_hr_raw or not resting_hr_raw or not samples:
+            return
+
+        heart_rates = [sample["heart_rate"] for sample in samples]
+        zone_seconds = metrics.time_in_zones(
+            heart_rates, SAMPLE_INTERVAL_S, float(resting_hr_raw), float(max_hr_raw)
+        )
+        if sum(zone_seconds) == 0:
+            return
+
+        frame = tb.Frame(parent)
+        frame.pack(fill="x", padx=16, pady=(0, 16))
+        tb.Label(frame, text="Time in zones", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+
+        zones_row = tb.Frame(frame)
+        zones_row.pack(anchor="w", pady=(4, 0))
+        for zone_index, seconds in enumerate(zone_seconds, start=1):
+            tb.Label(zones_row, text=f"Z{zone_index}: {format_duration(seconds)}").pack(side="left", padx=(0, 16))
 
     def _build_charts(self, parent: tb.Frame, samples: list[sqlite3.Row]) -> None:
         charts_frame = tb.Frame(parent)
