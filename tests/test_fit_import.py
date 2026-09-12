@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from eps_runcoach.core.fit_import import parse_fit_file
 
 SAMPLE_DIR = Path(__file__).parent.parent / "sample_data"
@@ -16,6 +18,19 @@ def test_parse_fit_file_extracts_summary():
     assert summary.avg_heart_rate == 144
     assert summary.max_heart_rate == 161
     assert summary.total_duration_s == 1674.501
+
+
+def test_pace_is_derived_from_distance_and_duration_not_avg_speed():
+    # This file's avg_speed implies ~4350m over the recorded duration, but
+    # total_distance is 5010m - a real example of a manually-corrected
+    # treadmill distance where the watch's own speed stream wasn't updated
+    # to match. Pace must follow the corrected distance, not avg_speed.
+    parsed = parse_fit_file(TREADMILL_FIT)
+    summary = parsed.summary
+
+    expected_pace = (summary.total_duration_s / 60) / summary.total_distance_km
+    assert summary.avg_pace_min_per_km == pytest.approx(expected_pace)
+    assert summary.avg_pace_min_per_km == pytest.approx(5.5705, abs=1e-3)
 
 
 def test_parse_fit_file_extracts_splits():

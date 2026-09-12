@@ -85,25 +85,34 @@ def _frame_fields(frame) -> dict[str, object]:
     return {f.name: f.value for f in frame.fields if not _is_gps_field(f.name)}
 
 
-def _pace_min_per_km(speed_m_s: float | None) -> float | None:
-    if not speed_m_s:
+def _pace_min_per_km(distance_km: float | None, duration_s: float | None) -> float | None:
+    """Pace from distance and duration, not from the device's own average
+    speed field. On a treadmill/machine, the watch's speed and per-record
+    distance stream come from an uncalibrated accelerometer estimate, and
+    can be badly wrong (seen up to +27% in real files) - whereas
+    total_distance is what gets manually corrected to match the machine's
+    console after the session. Deriving pace from distance/duration means
+    it reflects that correction; avg_speed would silently ignore it.
+    """
+    if not distance_km or not duration_s:
         return None
-    return (1000 / speed_m_s) / 60
+    return (duration_s / 60) / distance_km
 
 
 def _build_summary(session_data: dict[str, object], path: Path) -> SessionSummary:
     distance_m = session_data.get("total_distance")
-    avg_speed = session_data.get("enhanced_avg_speed") or session_data.get("avg_speed")
+    distance_km = (distance_m / 1000) if distance_m else None
+    duration_s = session_data.get("total_timer_time")
 
     return SessionSummary(
         sport=str(session_data.get("sport", "unknown")),
         sub_sport=str(session_data.get("sub_sport", "unknown")),
         start_time=session_data.get("start_time"),
-        total_distance_km=(distance_m / 1000) if distance_m else None,
-        total_duration_s=session_data.get("total_timer_time"),
+        total_distance_km=distance_km,
+        total_duration_s=duration_s,
         avg_heart_rate=session_data.get("avg_heart_rate"),
         max_heart_rate=session_data.get("max_heart_rate"),
-        avg_pace_min_per_km=_pace_min_per_km(avg_speed),
+        avg_pace_min_per_km=_pace_min_per_km(distance_km, duration_s),
         calories=session_data.get("total_calories"),
         total_ascent=session_data.get("total_ascent"),
         total_descent=session_data.get("total_descent"),
@@ -114,13 +123,14 @@ def _build_summary(session_data: dict[str, object], path: Path) -> SessionSummar
 
 def _build_split(lap_data: dict[str, object], split_index: int) -> SplitSummary:
     distance_m = lap_data.get("total_distance")
-    avg_speed = lap_data.get("enhanced_avg_speed") or lap_data.get("avg_speed")
+    distance_km = (distance_m / 1000) if distance_m else None
+    duration_s = lap_data.get("total_timer_time")
 
     return SplitSummary(
         split_index=split_index,
-        distance_km=(distance_m / 1000) if distance_m else None,
-        duration_s=lap_data.get("total_timer_time"),
-        avg_pace_min_per_km=_pace_min_per_km(avg_speed),
+        distance_km=distance_km,
+        duration_s=duration_s,
+        avg_pace_min_per_km=_pace_min_per_km(distance_km, duration_s),
         avg_heart_rate=lap_data.get("avg_heart_rate"),
     )
 
