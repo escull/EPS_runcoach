@@ -14,7 +14,8 @@ def test_import_files_imports_new_sessions(tmp_path):
 
     summary = import_files([TREADMILL_FIT, OUTDOOR_RUN_FIT], conn)
 
-    assert summary.imported == [TREADMILL_FIT.name, OUTDOOR_RUN_FIT.name]
+    assert [name for name, _ in summary.imported] == [TREADMILL_FIT.name, OUTDOOR_RUN_FIT.name]
+    assert all(isinstance(session_id, int) for _, session_id in summary.imported)
     assert summary.skipped == []
     assert summary.failed == []
     assert len(db.get_all_sessions(conn)) == 2
@@ -52,7 +53,7 @@ def test_import_files_records_unparseable_file_as_failed_not_a_crash(tmp_path):
     conn = db.get_connection(tmp_path / "test.db")
     summary = import_files([TREADMILL_FIT, bad_file], conn)
 
-    assert summary.imported == [TREADMILL_FIT.name]
+    assert [name for name, _ in summary.imported] == [TREADMILL_FIT.name]
     assert len(summary.failed) == 1
     assert summary.failed[0][0] == "corrupt.fit"
     assert len(db.get_all_sessions(conn)) == 1

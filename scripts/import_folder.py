@@ -26,7 +26,7 @@ def main() -> None:
         conn.close()
 
     print(f"Imported ({len(summary.imported)}):")
-    for name in summary.imported:
+    for name, _session_id in summary.imported:
         print(f"  + {name}")
 
     print(f"Skipped ({len(summary.skipped)}):")

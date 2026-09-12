@@ -16,7 +16,7 @@ from eps_runcoach.core.fit_import import classify_session_type, parse_fit_file
 
 @dataclass
 class ImportSummary:
-    imported: list[str] = field(default_factory=list)
+    imported: list[tuple[str, int]] = field(default_factory=list)  # (filename, session_id)
     skipped: list[tuple[str, str]] = field(default_factory=list)
     failed: list[tuple[str, str]] = field(default_factory=list)
 
@@ -60,7 +60,7 @@ def import_files(paths: list[str | Path], conn: sqlite3.Connection) -> ImportSum
         session_id = db.insert_session(conn, parsed.summary, file_hash=file_hash, session_type=session_type)
         db.insert_splits(conn, session_id, parsed.splits)
         db.insert_samples(conn, session_id, parsed.samples)
-        summary.imported.append(path.name)
+        summary.imported.append((path.name, session_id))
 
     return summary
 

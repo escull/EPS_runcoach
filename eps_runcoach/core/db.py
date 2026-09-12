@@ -235,6 +235,77 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
     conn.commit()
 
 
+def get_note(conn: sqlite3.Connection, session_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM notes WHERE session_id = ?", (session_id,)).fetchone()
+
+
+def upsert_note(
+    conn: sqlite3.Connection,
+    session_id: int,
+    rpe: int | None,
+    note_text: str | None,
+    focus_tag: str | None,
+) -> None:
+    """Insert or update the single note row for a session."""
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        """
+        INSERT INTO notes (session_id, rpe, note_text, focus_tag, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(session_id) DO UPDATE SET
+            rpe = excluded.rpe,
+            note_text = excluded.note_text,
+            focus_tag = excluded.focus_tag,
+            updated_at = excluded.updated_at
+        """,
+        (session_id, rpe, note_text, focus_tag, now, now),
+    )
+    conn.commit()
+
+
+def get_niggles_for_session(conn: sqlite3.Connection, session_id: int) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM niggles WHERE session_id = ? ORDER BY id", (session_id,)
+    ).fetchall()
+
+
+def delete_niggles_for_session(conn: sqlite3.Connection, session_id: int) -> None:
+    conn.execute("DELETE FROM niggles WHERE session_id = ?", (session_id,))
+    conn.commit()
+
+
+def insert_niggle(
+    conn: sqlite3.Connection,
+    session_id: int,
+    location: str,
+    side: str | None,
+    severity: int,
+) -> int:
+    cursor = conn.execute(
+        """
+        INSERT INTO niggles (session_id, location, side, severity, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (session_id, location, side, severity, datetime.now(timezone.utc).isoformat()),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
+def get_all_niggles_with_dates(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """All niggles joined with their session's start_time, newest session first
+    - used for both the severity-over-time chart and the recent-entries list.
+    """
+    return conn.execute(
+        """
+        SELECT niggles.*, sessions.start_time AS session_start_time
+        FROM niggles
+        JOIN sessions ON sessions.id = niggles.session_id
+        ORDER BY sessions.start_time DESC
+        """
+    ).fetchall()
+
+
 def insert_session(
     conn: sqlite3.Connection,
     summary: SessionSummary,

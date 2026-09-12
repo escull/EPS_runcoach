@@ -8,6 +8,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from eps_runcoach.charts.session_charts import heart_rate_chart, pace_chart
 from eps_runcoach.core import db
 from eps_runcoach.ui_tk.formatting import format_date, format_distance, format_duration, format_hr, format_pace
+from eps_runcoach.ui_tk.pages.how_did_it_go import HowDidItGoDialog
 
 SESSION_TYPES = ["run", "strength", "other"]
 
@@ -38,6 +39,7 @@ class SessionDetailWindow(tb.Toplevel):
         samples = db.get_samples(app.conn, session_id)
 
         self._build_header(body, session)
+        self._build_how_did_it_go_section(body)
         self._build_splits_table(body, splits)
         self._build_charts(body, samples)
 
@@ -71,6 +73,50 @@ class SessionDetailWindow(tb.Toplevel):
         sessions_page = self.app.pages.get("Sessions")
         if sessions_page is not None:
             sessions_page.refresh()
+
+    def _build_how_did_it_go_section(self, parent: tb.Frame) -> None:
+        self.how_did_it_go_frame = tb.Frame(parent)
+        self.how_did_it_go_frame.pack(fill="x", padx=16, pady=(0, 16))
+        self._render_how_did_it_go()
+
+    def _render_how_did_it_go(self) -> None:
+        for widget in self.how_did_it_go_frame.winfo_children():
+            widget.destroy()
+
+        note = db.get_note(self.app.conn, self.session_id)
+        niggles = db.get_niggles_for_session(self.app.conn, self.session_id)
+
+        tb.Label(self.how_did_it_go_frame, text="How did it go?", font=("Segoe UI", 11, "bold")).grid(
+            row=0, column=0, sticky="w"
+        )
+
+        parts = []
+        if note and note["rpe"] is not None:
+            parts.append(f"RPE {note['rpe']}/10")
+        if note and note["focus_tag"]:
+            parts.append(f"Focus: {note['focus_tag']}")
+        if note and note["note_text"]:
+            parts.append(f'"{note["note_text"]}"')
+        if niggles:
+            niggle_descriptions = []
+            for niggle in niggles:
+                side = niggle["side"]
+                side_text = f" ({side})" if side else ""
+                niggle_descriptions.append(f"{niggle['location']}{side_text} {niggle['severity']}/10")
+            parts.append(f"Niggles: {', '.join(niggle_descriptions)}")
+        summary_text = "   ".join(parts) if parts else "Not logged yet."
+
+        tb.Label(self.how_did_it_go_frame, text=summary_text, wraplength=700, justify="left").grid(
+            row=1, column=0, sticky="w", pady=(4, 4)
+        )
+
+        button_text = "Edit" if (note is not None or niggles) else "How did it go?"
+        tb.Button(
+            self.how_did_it_go_frame, text=button_text, command=self._open_how_did_it_go, bootstyle="secondary"
+        ).grid(row=2, column=0, sticky="w")
+
+    def _open_how_did_it_go(self) -> None:
+        HowDidItGoDialog(self.app, self.session_id, on_done=self._render_how_did_it_go)
 
     def _build_splits_table(self, parent: tb.Frame, splits: list[sqlite3.Row]) -> None:
         columns = ("split", "distance", "duration", "pace", "avg_hr")

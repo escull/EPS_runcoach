@@ -9,6 +9,7 @@ import ttkbootstrap as tb
 from eps_runcoach.core import db
 from eps_runcoach.core import settings as core_settings
 from eps_runcoach.core.importer import ImportSummary, import_files, import_folder
+from eps_runcoach.ui_tk.pages.how_did_it_go import HowDidItGoDialog
 
 
 class ImportPage(tb.Frame):
@@ -87,9 +88,24 @@ class ImportPage(tb.Frame):
         if sessions_page is not None:
             sessions_page.refresh()
 
+        self._start_how_did_it_go_flow([session_id for _name, session_id in summary.imported])
+
+    def _start_how_did_it_go_flow(self, session_ids: list[int]) -> None:
+        if not session_ids:
+            return
+        remaining = list(session_ids)
+
+        def show_next() -> None:
+            if not remaining:
+                return
+            session_id = remaining.pop(0)
+            HowDidItGoDialog(self.app, session_id, on_done=show_next)
+
+        show_next()
+
     def _show_summary(self, summary: ImportSummary) -> None:
         lines = [f"Imported ({len(summary.imported)}):"]
-        lines += [f"  + {name}" for name in summary.imported]
+        lines += [f"  + {name}" for name, _session_id in summary.imported]
         lines.append(f"Skipped ({len(summary.skipped)}):")
         lines += [f"  - {name}: {reason}" for name, reason in summary.skipped]
         lines.append(f"Failed ({len(summary.failed)}):")

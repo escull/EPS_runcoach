@@ -218,3 +218,60 @@ def test_get_and_set_setting(conn):
 
     db.set_setting(conn, "inbox_folder", "C:/other")
     assert db.get_setting(conn, "inbox_folder") == "C:/other"
+
+
+def test_get_note_when_none_exists(conn):
+    session_id = db.insert_session(conn, make_summary(), file_hash="one", session_type="run")
+    assert db.get_note(conn, session_id) is None
+
+
+def test_upsert_note_inserts_then_updates(conn):
+    session_id = db.insert_session(conn, make_summary(), file_hash="one", session_type="strength")
+
+    db.upsert_note(conn, session_id, rpe=7, note_text="Felt good", focus_tag="legs")
+    note = db.get_note(conn, session_id)
+    assert note["rpe"] == 7
+    assert note["note_text"] == "Felt good"
+    assert note["focus_tag"] == "legs"
+
+    db.upsert_note(conn, session_id, rpe=8, note_text="Actually tough", focus_tag="legs")
+    note = db.get_note(conn, session_id)
+    assert note["rpe"] == 8
+    assert note["note_text"] == "Actually tough"
+    assert conn.execute("SELECT COUNT(*) AS n FROM notes").fetchone()["n"] == 1
+
+
+def test_insert_and_get_niggles_for_session(conn):
+    session_id = db.insert_session(conn, make_summary(), file_hash="one", session_type="run")
+
+    db.insert_niggle(conn, session_id, location="ankle", side="left", severity=4)
+    db.insert_niggle(conn, session_id, location="knee", side=None, severity=2)
+
+    niggles = db.get_niggles_for_session(conn, session_id)
+    assert len(niggles) == 2
+    assert niggles[0]["location"] == "ankle"
+    assert niggles[0]["side"] == "left"
+    assert niggles[1]["location"] == "knee"
+    assert niggles[1]["side"] is None
+
+
+def test_delete_niggles_for_session(conn):
+    session_id = db.insert_session(conn, make_summary(), file_hash="one", session_type="run")
+    db.insert_niggle(conn, session_id, location="ankle", side="left", severity=4)
+
+    db.delete_niggles_for_session(conn, session_id)
+
+    assert db.get_niggles_for_session(conn, session_id) == []
+
+
+def test_get_all_niggles_with_dates_orders_newest_session_first(conn):
+    old_session = db.insert_session(conn, make_summary(start_time=datetime(2026, 1, 1, tzinfo=timezone.utc)), file_hash="old", session_type="run")
+    new_session = db.insert_session(conn, make_summary(start_time=datetime(2026, 6, 1, tzinfo=timezone.utc)), file_hash="new", session_type="run")
+
+    db.insert_niggle(conn, old_session, location="ankle", side="left", severity=3)
+    db.insert_niggle(conn, new_session, location="knee", side="right", severity=5)
+
+    rows = db.get_all_niggles_with_dates(conn)
+
+    assert [r["location"] for r in rows] == ["knee", "ankle"]
+    assert rows[0]["session_start_time"] == "2026-06-01T00:00:00+00:00"
