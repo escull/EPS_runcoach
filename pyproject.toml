@@ -3,6 +3,8 @@ name = "eps-runcoach"
 version = "0.1.0"
 description = "A private, single-user desktop app for recreational runners: FIT import, training metrics, and an AI coach."
 readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 authors = [
     { name = "escull_h", email = "edwinscull@gmail.com" }
 ]

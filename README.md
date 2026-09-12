@@ -120,3 +120,9 @@ Currently **Windows only**. The core logic and UI (tkinter/ttkbootstrap/matplotl
 ## Tech stack
 
 Python, tkinter + ttkbootstrap, matplotlib, SQLite, [fitdecode](https://github.com/polyvertex/fitdecode) for FIT parsing, and Google's Gemini API for the AI coach. Packaged with PyInstaller.
+
+## License
+
+Copyright (c) 2026 Edwin Scull
+
+Licensed under the GNU General Public License v3.0 (GPL-3.0) — see [LICENSE](LICENSE) for the full text. In short: you're free to use, study, modify and redistribute this code, but any distributed copy or modified version must also be released as source under GPL-3.0.
