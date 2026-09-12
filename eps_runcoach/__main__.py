@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from eps_runcoach.core.fit_import import read_fit_session
+from eps_runcoach.core.fit_import import parse_fit_file
 
 
 def main() -> None:
@@ -12,7 +12,8 @@ def main() -> None:
         return
 
     for fit_file in fit_files:
-        summary = read_fit_session(fit_file)
+        parsed = parse_fit_file(fit_file)
+        summary = parsed.summary
         print(f"{summary.source_file}")
         print(f"  Sport:     {summary.sport} ({summary.sub_sport})")
         print(f"  Start:     {summary.start_time}")
@@ -20,9 +21,10 @@ def main() -> None:
         print(f"  Duration:  {summary.total_duration_s / 60:.1f} min")
         print(f"  Avg pace:  {summary.avg_pace_min_per_km:.2f} min/km")
         print(f"  Avg HR:    {summary.avg_heart_rate} bpm (max {summary.max_heart_rate})")
+        print(f"  Splits:    {len(parsed.splits)}")
+        print(f"  Samples:   {len(parsed.samples)} (every {5}s)")
         print()
 
 
 if __name__ == "__main__":
     main()
-
