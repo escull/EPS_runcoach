@@ -15,6 +15,7 @@ from eps_runcoach.core import app_paths, db
 from eps_runcoach.core.coach.base import CoachError
 from eps_runcoach.core.coach.request import request_insights as run_insights_request
 from eps_runcoach.core.coach.request import request_review
+from eps_runcoach.core.error_log import log_exception
 from eps_runcoach.ui_tk.pages.ai_insights import AIInsightsPage
 from eps_runcoach.ui_tk.pages.dashboard import DashboardPage
 from eps_runcoach.ui_tk.pages.import_page import ImportPage
@@ -47,8 +48,17 @@ class App(tb.Window):
         self.conn = db.get_connection(self.db_path)
         self.pages: dict[str, tb.Frame] = {}
 
+        # In the packaged (windowed, no console) app, an unhandled exception
+        # in any Tkinter callback normally just vanishes - nothing is ever
+        # visible anywhere. Logging it here means a "the app did something
+        # odd" report is actually diagnosable later.
+        self.report_callback_exception = self._log_callback_exception
+
         self._build_layout()
         self.show_page("Sessions")
+
+    def _log_callback_exception(self, exc, val, tb) -> None:
+        log_exception("Unhandled Tkinter callback exception")
 
     def _build_layout(self) -> None:
         self.grid_rowconfigure(0, weight=1)
@@ -113,6 +123,9 @@ class App(tb.Window):
                 result_queue.put(None)
             except CoachError as exc:
                 result_queue.put(exc)
+            except Exception:  # noqa: BLE001 - must never leave the caller waiting forever
+                log_path = log_exception("Coach request")
+                result_queue.put(CoachError(f"Something unexpected went wrong - details logged to {log_path}"))
             finally:
                 conn.close()
 

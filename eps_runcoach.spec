@@ -10,9 +10,23 @@
 # shortcut to the .exe inside dist/EPS_RunCoach/ works exactly the same
 # either way.
 
+import os
+
 import ttkbootstrap
 
 block_cipher = None
+
+# PyInstaller's Analysis only follows actual Python imports - a non-.py
+# file sitting next to code (e.g. system_prompt.md) is invisible to it
+# unless listed here explicitly. Rather than hardcode each one (and
+# inevitably forget the next one added later), collect every non-.py
+# file under eps_runcoach/ automatically, keeping it next to its source
+# in the bundle so Path(__file__).parent-relative lookups still work.
+package_datas = []
+for root, _dirs, files in os.walk("eps_runcoach"):
+    for filename in files:
+        if not filename.endswith((".py", ".pyc")):
+            package_datas.append((os.path.join(root, filename), root))
 
 a = Analysis(
     ["eps_runcoach/__main__.py"],
@@ -21,6 +35,7 @@ a = Analysis(
     datas=[
         ("assets", "assets"),
         (ttkbootstrap.__path__[0], "ttkbootstrap"),
+        *package_datas,
     ],
     hiddenimports=[
         "google.genai",
