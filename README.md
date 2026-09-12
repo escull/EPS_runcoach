@@ -67,13 +67,11 @@ Built for one person's own training data, on their own machine. Nothing is uploa
 
 ## Getting started
 
-### Option A: Run the packaged app (Windows)
+### Option A: Install it (Windows)
 
-There's no installer yet — the packaged app is a folder (`dist/EPS_RunCoach/`) built with PyInstaller. To use it:
-
-1. Build it yourself from source (see below), or get a copy of the `dist/EPS_RunCoach/` folder from someone who has.
-2. Run `EPS_RunCoach.exe` inside that folder, or create a shortcut to it on your Desktop.
-3. Your data lives in `%APPDATA%\EPS RunCoach\` — separate from the source code, and untouched by rebuilding the app.
+1. Download the installer from the [latest release](https://github.com/escull/EPS_runcoach/releases/latest) — `EPS_RunCoach_Setup_vX.Y.Z.exe`.
+2. Run it and follow the wizard. It adds a Start Menu entry, an optional desktop shortcut, and an uninstaller under "Add or Remove Programs".
+3. Your data lives in `%APPDATA%\EPS RunCoach\` — separate from the install folder, and untouched by upgrading to a newer release.
 
 ### Option B: Run from source (any platform with Python)
 
@@ -87,13 +85,21 @@ uv run python -m eps_runcoach
 
 Your data lives in `data/` inside the project folder when run this way.
 
-### Building the packaged app yourself
+### Building the packaged app and installer yourself
 
 ```bash
 uv run pyinstaller eps_runcoach.spec --noconfirm
 ```
 
 Output goes to `dist/EPS_RunCoach/`. Safe to re-run any time — your data location doesn't change between rebuilds.
+
+To turn that into an installer like the one on the Releases page, install [Inno Setup](https://jrsoftware.org/isinfo.php) and compile `eps_runcoach.iss`:
+
+```bash
+ISCC.exe eps_runcoach.iss
+```
+
+Output goes to `dist_installer/EPS_RunCoach_Setup_vX.Y.Z.exe`.
 
 ## Configuration
 
@@ -116,6 +122,17 @@ See `CLAUDE.md` for the full architecture, coding conventions, and build-phase h
 ## Platform support
 
 Currently **Windows only**. The core logic and UI (tkinter/ttkbootstrap/matplotlib) are cross-platform, but the packaged build, data location (`%APPDATA%`), and app icon are Windows-specific right now. A macOS build would need to be produced on a Mac (PyInstaller doesn't cross-compile) and a few platform-specific bits generalised — not done yet, but not a large step either.
+
+## Roadmap
+
+Not built yet, in no particular order:
+
+- [ ] Weight tracking
+- [ ] Body fat % tracking
+- [ ] Height tracking
+- [ ] Others (TBD)
+
+See `RunCoach_Build_Plan.md` for the fuller nice-to-haves list.
 
 ## Tech stack
 
