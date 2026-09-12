@@ -1,5 +1,6 @@
-"""Presentation-only formatting helpers, used by pages to display session
-data in kilometres, min/km pace and UK date order.
+"""Presentation-only formatting helpers: kilometres, min/km pace, UK date
+order. Lives in core (not ui_tk) because the coach's context builder needs
+these too, and core can't depend on ui_tk.
 """
 
 from __future__ import annotations

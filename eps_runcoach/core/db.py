@@ -399,3 +399,29 @@ def insert_samples(conn: sqlite3.Connection, session_id: int, samples: list[Samp
         ],
     )
     conn.commit()
+
+
+def insert_ai_review(conn: sqlite3.Connection, session_id: int, provider: str, model: str, review_text: str) -> int:
+    cursor = conn.execute(
+        """
+        INSERT INTO ai_reviews (session_id, provider, model, review_text, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (session_id, provider, model, review_text, datetime.now(timezone.utc).isoformat()),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
+def get_latest_ai_review_for_session(conn: sqlite3.Connection, session_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM ai_reviews WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT 1",
+        (session_id,),
+    ).fetchone()
+
+
+def get_latest_ai_review(conn: sqlite3.Connection) -> sqlite3.Row | None:
+    """The single most recent review across all sessions - used for the
+    Dashboard's "Latest advice" panel.
+    """
+    return conn.execute("SELECT * FROM ai_reviews ORDER BY created_at DESC, id DESC LIMIT 1").fetchone()

@@ -5,7 +5,7 @@ import ttkbootstrap as tb
 
 from eps_runcoach.core import db
 from eps_runcoach.core import settings as core_settings
-from eps_runcoach.ui_tk.formatting import format_duration, parse_mmss_to_seconds
+from eps_runcoach.core.formatting import format_duration, parse_mmss_to_seconds
 
 
 class SettingsPage(tb.Frame):
@@ -46,6 +46,12 @@ class SettingsPage(tb.Frame):
         self.goal_var = tk.StringVar()
         tb.Entry(goal_row, textvariable=self.goal_var, width=10).pack(side="left", padx=8)
 
+        ai_model_row = tb.Frame(self)
+        ai_model_row.pack(fill="x", padx=16, pady=8)
+        tb.Label(ai_model_row, text="AI coach model:", width=16, anchor="w").pack(side="left")
+        self.ai_model_var = tk.StringVar()
+        tb.Entry(ai_model_row, textvariable=self.ai_model_var, width=25).pack(side="left", padx=8)
+
         tb.Button(self, text="Save", command=self._save, bootstyle="primary").pack(anchor="w", padx=16, pady=(8, 0))
 
         self.status_label = tb.Label(self, text="")
@@ -71,6 +77,10 @@ class SettingsPage(tb.Frame):
         goal_seconds = float(goal_seconds) if goal_seconds else core_settings.DEFAULT_GOAL_5K_SECONDS
         self.goal_var.set(format_duration(goal_seconds))
 
+        self.ai_model_var.set(
+            core_settings.get_setting(conn, core_settings.AI_MODEL_NAME_KEY, default=core_settings.DEFAULT_AI_MODEL_NAME)
+        )
+
         self.status_label.configure(text="")
 
     def _browse(self) -> None:
@@ -89,4 +99,5 @@ class SettingsPage(tb.Frame):
         core_settings.set_setting(conn, core_settings.MAX_HEART_RATE_KEY, self.max_hr_var.get())
         core_settings.set_setting(conn, core_settings.RESTING_HEART_RATE_KEY, self.resting_hr_var.get())
         core_settings.set_setting(conn, core_settings.GOAL_5K_SECONDS_KEY, str(goal_seconds))
+        core_settings.set_setting(conn, core_settings.AI_MODEL_NAME_KEY, self.ai_model_var.get())
         self.status_label.configure(text="Saved.", bootstyle="default")

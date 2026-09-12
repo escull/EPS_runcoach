@@ -1,4 +1,4 @@
-from eps_runcoach.ui_tk.formatting import (
+from eps_runcoach.core.formatting import (
     format_date,
     format_distance,
     format_duration,

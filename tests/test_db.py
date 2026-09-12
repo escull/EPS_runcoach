@@ -284,3 +284,26 @@ def test_get_max_observed_heart_rate(conn):
     db.insert_session(conn, make_summary(max_heart_rate=178), file_hash="b", session_type="run")
 
     assert db.get_max_observed_heart_rate(conn) == 178
+
+
+def test_insert_and_get_latest_ai_review_for_session(conn):
+    session_id = db.insert_session(conn, make_summary(), file_hash="a", session_type="run")
+
+    assert db.get_latest_ai_review_for_session(conn, session_id) is None
+
+    db.insert_ai_review(conn, session_id, provider="gemini", model="gemini-3.8-flash", review_text="Nice work.")
+    db.insert_ai_review(conn, session_id, provider="gemini", model="gemini-3.8-flash", review_text="Regenerated.")
+
+    latest = db.get_latest_ai_review_for_session(conn, session_id)
+    assert latest["review_text"] == "Regenerated."
+
+
+def test_get_latest_ai_review_across_all_sessions(conn):
+    assert db.get_latest_ai_review(conn) is None
+
+    session_a = db.insert_session(conn, make_summary(), file_hash="a", session_type="run")
+    session_b = db.insert_session(conn, make_summary(), file_hash="b", session_type="run")
+    db.insert_ai_review(conn, session_a, provider="gemini", model="gemini-3.8-flash", review_text="First.")
+    db.insert_ai_review(conn, session_b, provider="gemini", model="gemini-3.8-flash", review_text="Second.")
+
+    assert db.get_latest_ai_review(conn)["review_text"] == "Second."

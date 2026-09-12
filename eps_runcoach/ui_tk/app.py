@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import queue
+import threading
 from pathlib import Path
+from tkinter import messagebox
+from typing import Callable
 
 import ttkbootstrap as tb
 
 from eps_runcoach.core import db
+from eps_runcoach.core.coach.base import CoachError
+from eps_runcoach.core.coach.request import request_review
 from eps_runcoach.ui_tk.pages.dashboard import DashboardPage
 from eps_runcoach.ui_tk.pages.import_page import ImportPage
 from eps_runcoach.ui_tk.pages.niggles import NigglesPage
@@ -72,6 +78,39 @@ class App(tb.Window):
 
     def open_session_detail(self, session_id: int) -> None:
         SessionDetailWindow(app=self, session_id=session_id)
+
+    def request_coaching(self, session_id: int, on_done: Callable[[], None] | None = None) -> None:
+        """Ask the AI coach to review a session, in a background thread
+        using its own database connection (sqlite3 connections aren't
+        safe to share across threads). Errors show as a friendly popup
+        rather than crashing; nothing is saved if the request fails.
+        """
+        result_queue: queue.Queue = queue.Queue()
+
+        def run() -> None:
+            conn = db.get_connection(self.db_path)
+            try:
+                request_review(conn, session_id)
+                result_queue.put(None)
+            except CoachError as exc:
+                result_queue.put(exc)
+            finally:
+                conn.close()
+
+        threading.Thread(target=run, daemon=True).start()
+        self._poll_coaching_result(result_queue, on_done)
+
+    def _poll_coaching_result(self, result_queue: queue.Queue, on_done: Callable[[], None] | None) -> None:
+        try:
+            result = result_queue.get_nowait()
+        except queue.Empty:
+            self.after(200, lambda: self._poll_coaching_result(result_queue, on_done))
+            return
+
+        if isinstance(result, CoachError):
+            messagebox.showwarning("Coach unavailable", str(result))
+        if on_done is not None:
+            on_done()
 
     def _on_close(self) -> None:
         self.conn.close()

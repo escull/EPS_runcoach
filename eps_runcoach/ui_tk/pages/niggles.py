@@ -5,7 +5,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 
 from eps_runcoach.charts.niggles_chart import niggle_severity_chart
 from eps_runcoach.core import db
-from eps_runcoach.ui_tk.formatting import format_date
+from eps_runcoach.core.formatting import format_date
 
 COLUMNS = [
     ("date", "Date", 90),

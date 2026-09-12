@@ -1,0 +1,134 @@
+"""Builds the compact text summary sent to the AI coach: goal/settings,
+recent weekly totals, session-by-session detail for the last 10 days,
+current fitness/fatigue/form, and the latest 5k estimate. Never includes
+GPS, names, or raw files - only summarised stats and notes (nothing
+tracked in this app includes any of those anyway).
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from datetime import date, timedelta
+
+from eps_runcoach.core import db, training_data
+from eps_runcoach.core import settings as core_settings
+from eps_runcoach.core.formatting import format_date, format_distance, format_duration, format_hr, format_pace
+
+RECENT_SESSION_DAYS = 10
+WEEKLY_TOTALS_WEEKS = 4
+
+
+def build_context(conn: sqlite3.Connection, as_of: date | None = None) -> str:
+    as_of = as_of or date.today()
+
+    max_hr_raw = core_settings.get_setting(conn, core_settings.MAX_HEART_RATE_KEY)
+    resting_hr_raw = core_settings.get_setting(conn, core_settings.RESTING_HEART_RATE_KEY)
+    goal_raw = core_settings.get_setting(conn, core_settings.GOAL_5K_SECONDS_KEY)
+    goal_seconds = float(goal_raw) if goal_raw else core_settings.DEFAULT_GOAL_5K_SECONDS
+
+    snapshot = None
+    if max_hr_raw and resting_hr_raw:
+        snapshot = training_data.build_snapshot(conn, float(resting_hr_raw), float(max_hr_raw), as_of=as_of)
+
+    lines: list[str] = []
+    lines.append("=== Goal and settings ===")
+    lines.append(f"5k goal: {format_duration(goal_seconds)}")
+    lines.append(f"Max heart rate: {max_hr_raw} bpm" if max_hr_raw else "Max heart rate: not set")
+    lines.append(f"Resting heart rate: {resting_hr_raw} bpm" if resting_hr_raw else "Resting heart rate: not set")
+
+    lines.append("")
+    lines.append(f"=== Weekly totals (last {WEEKLY_TOTALS_WEEKS} weeks) ===")
+    lines.extend(_weekly_totals_lines(snapshot, as_of))
+
+    lines.append("")
+    lines.append(f"=== Sessions from the last {RECENT_SESSION_DAYS} days ===")
+    lines.extend(_recent_session_lines(conn, as_of))
+
+    lines.append("")
+    lines.append("=== Current training state ===")
+    lines.extend(_training_state_lines(snapshot))
+
+    return "\n".join(lines)
+
+
+def _weekly_totals_lines(snapshot: training_data.TrainingSnapshot | None, as_of: date) -> list[str]:
+    if snapshot is None:
+        return ["(unavailable - heart rate settings not configured)"]
+
+    current_week_start = as_of - timedelta(days=as_of.weekday())
+    week_starts = [current_week_start - timedelta(weeks=i) for i in range(WEEKLY_TOTALS_WEEKS)]
+    week_starts.reverse()
+
+    lines = []
+    for week_start in week_starts:
+        distance = snapshot.weekly_distance.get(week_start, 0.0)
+        run_load = snapshot.weekly_run_load.get(week_start, 0.0)
+        other_load = snapshot.weekly_other_load.get(week_start, 0.0)
+        lines.append(
+            f"Week of {format_date(week_start.isoformat())}: "
+            f"{distance:.1f} km running, run load {run_load:.0f}, other load {other_load:.0f}"
+        )
+    return lines
+
+
+def _recent_session_lines(conn: sqlite3.Connection, as_of: date) -> list[str]:
+    cutoff = as_of - timedelta(days=RECENT_SESSION_DAYS)
+    sessions = db.get_all_sessions(conn)
+    recent = [s for s in sessions if training_data.parse_session_date(s["start_time"]) >= cutoff]
+
+    if not recent:
+        return ["(no sessions in this window)"]
+
+    return [_describe_session(conn, session) for session in reversed(recent)]  # oldest first
+
+
+def _training_state_lines(snapshot: training_data.TrainingSnapshot | None) -> list[str]:
+    if snapshot is None or snapshot.latest_fitness is None:
+        lines = ["(unavailable - heart rate settings not configured, or no sessions yet)"]
+    else:
+        lines = [
+            f"Fitness: {snapshot.latest_fitness:.0f}",
+            f"Fatigue: {snapshot.latest_fatigue:.0f}",
+            f"Form: {snapshot.latest_form:.0f}",
+        ]
+
+    if snapshot is not None and snapshot.estimate_5k_seconds is not None:
+        lines.append(f"Latest 5k estimate: {format_duration(snapshot.estimate_5k_seconds)}")
+    else:
+        lines.append("Latest 5k estimate: not enough recent data")
+
+    return lines
+
+
+def _describe_session(conn: sqlite3.Connection, session: sqlite3.Row) -> str:
+    parts = [
+        f"- {format_date(session['start_time'])} {session['session_type']} "
+        f"({session['sport']}/{session['sub_sport']}): duration {format_duration(session['duration_s'])}"
+    ]
+    if session["distance_km"]:
+        parts.append(f"distance {format_distance(session['distance_km'])}")
+        parts.append(f"pace {format_pace(session['avg_pace_min_per_km'])}")
+    if session["avg_heart_rate"]:
+        parts.append(f"avg HR {format_hr(session['avg_heart_rate'])}")
+
+    note = db.get_note(conn, session["id"])
+    if note and note["rpe"] is not None:
+        parts.append(f"RPE {note['rpe']}/10")
+    if note and note["focus_tag"]:
+        parts.append(f"focus {note['focus_tag']}")
+
+    text = ", ".join(parts)
+
+    if note and note["note_text"]:
+        text += f'\n  note: "{note["note_text"]}"'
+
+    niggles = db.get_niggles_for_session(conn, session["id"])
+    if niggles:
+        descriptions = []
+        for niggle in niggles:
+            side = niggle["side"]
+            side_text = f" ({side})" if side else ""
+            descriptions.append(f"{niggle['location']}{side_text} {niggle['severity']}/10")
+        text += f"\n  niggles: {', '.join(descriptions)}"
+
+    return text

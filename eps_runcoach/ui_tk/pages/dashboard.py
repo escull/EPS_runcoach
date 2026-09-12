@@ -1,12 +1,12 @@
 """Dashboard page: estimated 5k vs goal, fitness/fatigue/form, weekly
-distance and load, and aerobic efficiency - recomputed from the database
-each time the page is shown.
+distance and load, aerobic efficiency, and the coach's latest advice -
+recomputed from the database each time the page is shown.
 """
 
 from __future__ import annotations
 
 import tkinter as tk
-from datetime import date, datetime, timedelta
+from datetime import date
 from tkinter import ttk
 
 import ttkbootstrap as tb
@@ -18,13 +18,9 @@ from eps_runcoach.charts.dashboard_charts import (
     weekly_distance_chart,
     weekly_load_chart,
 )
-from eps_runcoach.core import db, metrics
+from eps_runcoach.core import db, training_data
 from eps_runcoach.core import settings as core_settings
-from eps_runcoach.ui_tk.formatting import format_duration
-
-
-def _parse_date(start_time: str) -> date:
-    return datetime.fromisoformat(start_time).date()
+from eps_runcoach.core.formatting import format_date, format_duration
 
 
 class DashboardPage(tb.Frame):
@@ -77,56 +73,19 @@ class DashboardPage(tb.Frame):
             )
             return
 
-        max_hr = float(max_hr_raw)
-        resting_hr = float(resting_hr_raw)
         goal_raw = core_settings.get_setting(conn, core_settings.GOAL_5K_SECONDS_KEY)
         goal_seconds = float(goal_raw) if goal_raw else core_settings.DEFAULT_GOAL_5K_SECONDS
 
-        session_loads: list[tuple[date, float]] = []
-        run_sessions_for_estimate: list[tuple[date, float, float]] = []
-        weekly_distance: dict[date, float] = {}
-        weekly_run_load: dict[date, float] = {}
-        weekly_other_load: dict[date, float] = {}
-        aerobic_points: list[tuple[date, float]] = []
+        snapshot = training_data.build_snapshot(conn, float(resting_hr_raw), float(max_hr_raw))
 
-        for session in sessions:
-            session_date = _parse_date(session["start_time"])
-            note = db.get_note(conn, session["id"])
-            rpe = note["rpe"] if note else None
+        self._render_5k_estimate(snapshot.estimate_5k_seconds, goal_seconds)
+        self._render_latest_advice()
+        self._render_fitness_fatigue_form(snapshot.dates, snapshot.fitness, snapshot.fatigue, snapshot.form)
+        self._render_weekly_distance(snapshot.weekly_distance)
+        self._render_weekly_load(snapshot.weekly_run_load, snapshot.weekly_other_load)
+        self._render_aerobic_efficiency(snapshot.aerobic_points)
 
-            trimp_value = metrics.trimp(session["avg_heart_rate"], session["duration_s"], resting_hr, max_hr)
-            srpe_value = metrics.srpe_load(rpe, session["duration_s"])
-            load = metrics.combined_session_load(trimp_value, srpe_value)
-            if load is not None:
-                session_loads.append((session_date, load))
-
-            week_start = session_date - timedelta(days=session_date.weekday())
-            if session["session_type"] == "run":
-                weekly_distance[week_start] = weekly_distance.get(week_start, 0.0) + (session["distance_km"] or 0.0)
-                if load is not None:
-                    weekly_run_load[week_start] = weekly_run_load.get(week_start, 0.0) + load
-            elif load is not None:
-                weekly_other_load[week_start] = weekly_other_load.get(week_start, 0.0) + load
-
-            if session["session_type"] == "run" and session["distance_km"] and session["duration_s"]:
-                run_sessions_for_estimate.append((session_date, session["distance_km"], session["duration_s"]))
-
-                samples = db.get_samples(conn, session["id"])
-                heart_rates = [s["heart_rate"] for s in samples]
-                speeds = [s["speed_m_s"] for s in samples]
-                pace = metrics.aerobic_efficiency_pace(heart_rates, speeds, resting_hr, max_hr)
-                if pace is not None:
-                    aerobic_points.append((session_date, pace))
-
-        self._render_5k_estimate(run_sessions_for_estimate, goal_seconds)
-        self._render_fitness_fatigue_form(session_loads)
-        self._render_weekly_distance(weekly_distance)
-        self._render_weekly_load(weekly_run_load, weekly_other_load)
-        self._render_aerobic_efficiency(aerobic_points)
-
-    def _render_5k_estimate(self, runs: list[tuple[date, float, float]], goal_seconds: float) -> None:
-        estimate_seconds = metrics.estimate_5k_seconds(runs, as_of=date.today())
-
+    def _render_5k_estimate(self, estimate_seconds: float | None, goal_seconds: float) -> None:
         frame = tb.Frame(self.content_frame)
         frame.pack(fill="x", padx=16, pady=(0, 16))
 
@@ -145,6 +104,22 @@ class DashboardPage(tb.Frame):
             bootstyle="secondary",
         ).pack(anchor="w")
 
+    def _render_latest_advice(self) -> None:
+        review = db.get_latest_ai_review(self.app.conn)
+
+        frame = tb.Frame(self.content_frame)
+        frame.pack(fill="x", padx=16, pady=(0, 16))
+        tb.Label(frame, text="Latest advice", font=("Segoe UI", 13, "bold")).pack(anchor="w")
+
+        if review is None:
+            tb.Label(frame, text="No coaching advice yet - save a \"How did it go?\" entry to request some.").pack(
+                anchor="w"
+            )
+            return
+
+        tb.Label(frame, text=format_date(review["created_at"]), bootstyle="secondary").pack(anchor="w")
+        tb.Label(frame, text=review["review_text"], wraplength=800, justify="left").pack(anchor="w", pady=(4, 0))
+
     def _add_chart(self, figure, caption: str) -> None:
         block = tb.Frame(self.content_frame)
         block.pack(fill="both", padx=16, pady=(0, 16))
@@ -157,8 +132,7 @@ class DashboardPage(tb.Frame):
             anchor="w", pady=(4, 0)
         )
 
-    def _render_fitness_fatigue_form(self, session_loads: list[tuple[date, float]]) -> None:
-        dates, fitness, fatigue, form = metrics.fitness_fatigue_form(session_loads)
+    def _render_fitness_fatigue_form(self, dates: list[date], fitness, fatigue, form) -> None:
         figure = fitness_fatigue_form_chart(dates, fitness, fatigue, form)
         self._add_chart(
             figure,
@@ -180,7 +154,6 @@ class DashboardPage(tb.Frame):
         self._add_chart(figure, "Combined training stress from running and strength/other sessions each week.")
 
     def _render_aerobic_efficiency(self, points: list[tuple[date, float]]) -> None:
-        points.sort(key=lambda point: point[0])
         dates = [point[0] for point in points]
         paces = [point[1] for point in points]
         figure = aerobic_efficiency_chart(dates, paces)

@@ -142,6 +142,7 @@ class HowDidItGoDialog(tb.Toplevel):
                 severity=niggle["severity"],
             )
 
+        self.app.request_coaching(self.session_id)
         self._close()
 
     def _skip(self) -> None:

@@ -3,7 +3,7 @@ from tkinter import ttk
 import ttkbootstrap as tb
 
 from eps_runcoach.core import db
-from eps_runcoach.ui_tk.formatting import format_date, format_distance, format_duration, format_hr, format_pace
+from eps_runcoach.core.formatting import format_date, format_distance, format_duration, format_hr, format_pace
 
 COLUMNS = [
     ("date", "Date", 90),

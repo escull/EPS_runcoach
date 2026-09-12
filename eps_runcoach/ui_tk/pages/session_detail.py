@@ -9,7 +9,7 @@ from eps_runcoach.charts.session_charts import heart_rate_chart, pace_chart
 from eps_runcoach.core import db, metrics
 from eps_runcoach.core import settings as core_settings
 from eps_runcoach.core.fit_import import SAMPLE_INTERVAL_S
-from eps_runcoach.ui_tk.formatting import format_date, format_distance, format_duration, format_hr, format_pace
+from eps_runcoach.core.formatting import format_date, format_distance, format_duration, format_hr, format_pace
 from eps_runcoach.ui_tk.pages.how_did_it_go import HowDidItGoDialog
 
 SESSION_TYPES = ["run", "strength", "other"]
@@ -42,6 +42,7 @@ class SessionDetailWindow(tb.Toplevel):
 
         self._build_header(body, session)
         self._build_how_did_it_go_section(body)
+        self._build_advice_section(body)
         self._build_splits_table(body, splits)
         self._build_zones_section(body, samples)
         self._build_charts(body, samples)
@@ -120,6 +121,40 @@ class SessionDetailWindow(tb.Toplevel):
 
     def _open_how_did_it_go(self) -> None:
         HowDidItGoDialog(self.app, self.session_id, on_done=self._render_how_did_it_go)
+
+    def _build_advice_section(self, parent: tb.Frame) -> None:
+        self.advice_frame = tb.Frame(parent)
+        self.advice_frame.pack(fill="x", padx=16, pady=(0, 16))
+        self._render_advice()
+
+    def _render_advice(self) -> None:
+        if not self.winfo_exists():
+            return
+        for widget in self.advice_frame.winfo_children():
+            widget.destroy()
+
+        review = db.get_latest_ai_review_for_session(self.app.conn, self.session_id)
+
+        tb.Label(self.advice_frame, text="Coach's advice", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+
+        if review is None:
+            tb.Label(self.advice_frame, text="No advice yet.").pack(anchor="w", pady=(4, 4))
+        else:
+            tb.Label(self.advice_frame, text=format_date(review["created_at"]), bootstyle="secondary").pack(
+                anchor="w"
+            )
+            tb.Label(self.advice_frame, text=review["review_text"], wraplength=800, justify="left").pack(
+                anchor="w", pady=(4, 4)
+            )
+
+        self.regenerate_button = tb.Button(
+            self.advice_frame, text="Regenerate", command=self._request_advice, bootstyle="secondary"
+        )
+        self.regenerate_button.pack(anchor="w")
+
+    def _request_advice(self) -> None:
+        self.regenerate_button.configure(state="disabled", text="Generating...")
+        self.app.request_coaching(self.session_id, on_done=self._render_advice)
 
     def _build_splits_table(self, parent: tb.Frame, splits: list[sqlite3.Row]) -> None:
         columns = ("split", "distance", "duration", "pace", "avg_hr")
