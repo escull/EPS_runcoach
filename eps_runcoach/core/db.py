@@ -200,6 +200,41 @@ def get_all_sessions(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute("SELECT * FROM sessions ORDER BY start_time DESC").fetchall()
 
 
+def get_session(conn: sqlite3.Connection, session_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
+
+
+def update_session_type(conn: sqlite3.Connection, session_id: int, session_type: str) -> None:
+    conn.execute("UPDATE sessions SET session_type = ? WHERE id = ?", (session_type, session_id))
+    conn.commit()
+
+
+def get_splits(conn: sqlite3.Connection, session_id: int) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM splits WHERE session_id = ? ORDER BY split_index", (session_id,)
+    ).fetchall()
+
+
+def get_samples(conn: sqlite3.Connection, session_id: int) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM samples WHERE session_id = ? ORDER BY elapsed_s", (session_id,)
+    ).fetchall()
+
+
+def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row is not None else default
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
+    conn.commit()
+
+
 def insert_session(
     conn: sqlite3.Connection,
     summary: SessionSummary,

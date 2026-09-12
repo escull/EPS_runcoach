@@ -165,3 +165,56 @@ def test_init_db_backs_up_before_applying_a_new_migration(tmp_path, monkeypatch)
     assert db.session_exists(conn, "existing")
 
     assert list(backup_dir.glob("test_*.db"))
+
+
+def test_get_session_by_id(conn):
+    session_id = db.insert_session(conn, make_summary(), file_hash="one", session_type="run")
+
+    row = db.get_session(conn, session_id)
+    assert row["file_hash"] == "one"
+    assert db.get_session(conn, session_id + 999) is None
+
+
+def test_update_session_type(conn):
+    session_id = db.insert_session(conn, make_summary(), file_hash="one", session_type="run")
+
+    db.update_session_type(conn, session_id, "strength")
+
+    assert db.get_session(conn, session_id)["session_type"] == "strength"
+
+
+def test_get_splits_and_samples_ordered(conn):
+    session_id = db.insert_session(conn, make_summary(), file_hash="one", session_type="run")
+    db.insert_splits(
+        conn,
+        session_id,
+        [
+            SplitSummary(split_index=2, distance_km=1.0, duration_s=300.0, avg_pace_min_per_km=5.0, avg_heart_rate=140),
+            SplitSummary(split_index=1, distance_km=1.0, duration_s=290.0, avg_pace_min_per_km=4.8, avg_heart_rate=145),
+        ],
+    )
+    db.insert_samples(
+        conn,
+        session_id,
+        [
+            Sample(elapsed_s=5.0, distance_km=0.02, speed_m_s=3.3, heart_rate=132, cadence=80.0, altitude_m=10.0),
+            Sample(elapsed_s=0.0, distance_km=0.0, speed_m_s=3.3, heart_rate=130, cadence=80.0, altitude_m=10.0),
+        ],
+    )
+
+    splits = db.get_splits(conn, session_id)
+    samples = db.get_samples(conn, session_id)
+
+    assert [s["split_index"] for s in splits] == [1, 2]
+    assert [s["elapsed_s"] for s in samples] == [0.0, 5.0]
+
+
+def test_get_and_set_setting(conn):
+    assert db.get_setting(conn, "inbox_folder") is None
+    assert db.get_setting(conn, "inbox_folder", default="fallback") == "fallback"
+
+    db.set_setting(conn, "inbox_folder", "C:/inbox")
+    assert db.get_setting(conn, "inbox_folder") == "C:/inbox"
+
+    db.set_setting(conn, "inbox_folder", "C:/other")
+    assert db.get_setting(conn, "inbox_folder") == "C:/other"
