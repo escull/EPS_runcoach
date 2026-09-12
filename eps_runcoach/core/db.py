@@ -13,7 +13,6 @@ from pathlib import Path
 from eps_runcoach.core.fit_import import Sample, SessionSummary, SplitSummary
 
 DEFAULT_DB_PATH = Path("data/eps_runcoach.db")
-DEFAULT_BACKUP_DIR = Path("data/backups")
 MAX_BACKUPS = 10
 
 # Each migration is (version, sql). Applied once, in order, each in its own
@@ -106,6 +105,12 @@ MIGRATIONS: list[tuple[int, str]] = [
 ]
 
 
+def get_db_path(conn: sqlite3.Connection) -> Path:
+    """Return the file path of the database a connection is attached to."""
+    row = conn.execute("PRAGMA database_list").fetchone()
+    return Path(row[2])
+
+
 def get_connection(db_path: str | Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
     """Open a connection with foreign keys enforced, creating the schema (or
     applying any pending migrations) first if needed.
@@ -146,7 +151,7 @@ def init_db(conn: sqlite3.Connection, db_path: str | Path = DEFAULT_DB_PATH) -> 
         return
 
     if db_had_existing_data:
-        backup_database(db_path, DEFAULT_BACKUP_DIR)
+        backup_database(db_path)
 
     for version, sql in pending:
         conn.executescript(sql)
@@ -156,18 +161,19 @@ def init_db(conn: sqlite3.Connection, db_path: str | Path = DEFAULT_DB_PATH) -> 
 
 def backup_database(
     db_path: str | Path = DEFAULT_DB_PATH,
-    backup_dir: str | Path = DEFAULT_BACKUP_DIR,
+    backup_dir: str | Path | None = None,
     keep: int = MAX_BACKUPS,
 ) -> Path | None:
-    """Copy the database file into backup_dir with a timestamped name, then
-    prune to the most recent `keep` backups. Returns the backup path, or
-    None if there was no database file to back up.
+    """Copy the database file into backup_dir (default: a `backups` folder
+    next to the database itself) with a timestamped name, then prune to the
+    most recent `keep` backups. Returns the backup path, or None if there
+    was no database file to back up.
     """
     db_path = Path(db_path)
     if not db_path.exists():
         return None
 
-    backup_dir = Path(backup_dir)
+    backup_dir = Path(backup_dir) if backup_dir is not None else db_path.parent / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")

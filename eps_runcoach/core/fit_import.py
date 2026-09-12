@@ -65,6 +65,22 @@ def _is_gps_field(field_name: str) -> bool:
     return any(marker in field_name for marker in GPS_FIELD_MARKERS)
 
 
+def classify_session_type(sport: str, sub_sport: str) -> str:
+    """Map a FIT sport/sub_sport pair to one of our broad session types:
+    'run', 'strength' or 'other'. This is only a starting default — the
+    UI will let sessions be corrected by hand, since the FIT classification
+    doesn't always match how a session should be trained/coached (e.g. a
+    treadmill run is still 'run', but we haven't yet seen what sport/
+    sub_sport Suunto assigns to a gym/strength session to classify it
+    directly).
+    """
+    if sport == "running":
+        return "run"
+    if sport in ("training", "strength_training"):
+        return "strength"
+    return "other"
+
+
 def _frame_fields(frame) -> dict[str, object]:
     return {f.name: f.value for f in frame.fields if not _is_gps_field(f.name)}
 

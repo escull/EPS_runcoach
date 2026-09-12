@@ -151,7 +151,6 @@ def test_backup_database_creates_and_prunes(tmp_path):
 def test_init_db_backs_up_before_applying_a_new_migration(tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
     backup_dir = tmp_path / "backups"
-    monkeypatch.setattr(db, "DEFAULT_BACKUP_DIR", backup_dir)
 
     conn = db.get_connection(db_path)
     db.insert_session(conn, make_summary(), file_hash="existing", session_type="run")
