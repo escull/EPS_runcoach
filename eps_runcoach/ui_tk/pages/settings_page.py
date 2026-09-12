@@ -6,6 +6,7 @@ import ttkbootstrap as tb
 from eps_runcoach.core import db
 from eps_runcoach.core import settings as core_settings
 from eps_runcoach.core.coach.api_key import get_api_key, set_api_key
+from eps_runcoach.core.export import export_all_to_csv
 from eps_runcoach.core.formatting import format_duration, parse_mmss_to_seconds
 
 
@@ -64,6 +65,18 @@ class SettingsPage(tb.Frame):
         self.status_label = tb.Label(self, text="")
         self.status_label.pack(anchor="w", padx=16, pady=(4, 0))
 
+        data_row = tb.Frame(self)
+        data_row.pack(anchor="w", padx=16, pady=(16, 0))
+        tb.Button(data_row, text="Back up now", command=self._back_up_now, bootstyle="secondary").pack(
+            side="left", padx=(0, 8)
+        )
+        tb.Button(
+            data_row, text="Export all data to CSV...", command=self._export_to_csv, bootstyle="secondary"
+        ).pack(side="left")
+
+        self.data_status_label = tb.Label(self, text="")
+        self.data_status_label.pack(anchor="w", padx=16, pady=(4, 0))
+
     def on_show(self) -> None:
         conn = self.app.conn
         self.inbox_var.set(core_settings.get_setting(conn, core_settings.INBOX_FOLDER_KEY, default=""))
@@ -91,6 +104,7 @@ class SettingsPage(tb.Frame):
         self.api_key_var.set(get_api_key())
 
         self.status_label.configure(text="")
+        self.data_status_label.configure(text="")
 
     def _browse(self) -> None:
         folder = filedialog.askdirectory()
@@ -111,3 +125,17 @@ class SettingsPage(tb.Frame):
         core_settings.set_setting(conn, core_settings.AI_MODEL_NAME_KEY, self.ai_model_var.get())
         set_api_key(self.api_key_var.get())
         self.status_label.configure(text="Saved.", bootstyle="default")
+
+    def _back_up_now(self) -> None:
+        backup_path = db.backup_database(db.get_db_path(self.app.conn))
+        if backup_path is None:
+            self.data_status_label.configure(text="Nothing to back up yet.", bootstyle="secondary")
+        else:
+            self.data_status_label.configure(text=f"Backed up to {backup_path}", bootstyle="default")
+
+    def _export_to_csv(self) -> None:
+        folder = filedialog.askdirectory(title="Choose a folder for the CSV export")
+        if not folder:
+            return
+        written = export_all_to_csv(self.app.conn, folder)
+        self.data_status_label.configure(text=f"Exported {len(written)} CSV files to {folder}", bootstyle="default")

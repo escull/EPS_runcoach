@@ -11,7 +11,7 @@ from typing import Callable
 
 import ttkbootstrap as tb
 
-from eps_runcoach.core import db
+from eps_runcoach.core import app_paths, db
 from eps_runcoach.core.coach.base import CoachError
 from eps_runcoach.core.coach.request import request_insights as run_insights_request
 from eps_runcoach.core.coach.request import request_review
@@ -35,11 +35,13 @@ PAGES = [
 
 class App(tb.Window):
     def __init__(self, db_path: str | Path = db.DEFAULT_DB_PATH):
+        icon_path = app_paths.get_resource_path("assets/icon.ico")
         super().__init__(
             title="EPS RunCoach",
             themename="bootstrap-light",
             size=(1100, 700),
             on_close=self._on_close,
+            iconphoto=str(icon_path) if icon_path.exists() else "",
         )
         self.db_path = Path(db_path)
         self.conn = db.get_connection(self.db_path)

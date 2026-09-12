@@ -15,14 +15,22 @@ I'm a beginner with a bit of scripting experience. I'm building this by vibe cod
 
 ## Tech stack
 - Python 3.14 from python.org (system Python, NOT uv-managed — we need its Tcl/Tk). Dependencies managed with uv (`uv add`, `uv run`). Never use pip directly.
-- UI: tkinter + ttk, with a modern theme (sv-ttk or ttkbootstrap — to be decided in Phase 3).
+- UI: tkinter + ttk with ttkbootstrap (`bootstrap-light` theme) — chosen over sv-ttk, which looked stalled (no commits in over a year) when compared in Phase 3.
 - Charts: matplotlib, embedded with FigureCanvasTkAgg + NavigationToolbar2Tk.
-- Maths: numpy; pandas where it genuinely simplifies time-series work.
-- Storage: SQLite via the built-in sqlite3 module. Database at data/eps_runcoach.db.
+- Maths: numpy; pandas where it genuinely simplifies time-series work (not needed yet — a plain EWMA loop covered fitness/fatigue/form).
+- Storage: SQLite via the built-in sqlite3 module. Database at `data/eps_runcoach.db` in dev, `%APPDATA%\EPS RunCoach\eps_runcoach.db` when packaged (see Packaging below).
 - FIT parsing: fitdecode — pure-Python, simple API, easier to work with than Garmin's official FIT SDK for a beginner-driven project.
-- AI coach: behind a provider interface. First provider: Gemini via `google-genai` (free tier, Flash model). Key from `.env` via python-dotenv. Model name lives in settings, not code.
+- AI coach: behind a provider interface. First provider: Gemini via `google-genai` (currently `gemini-3.8-flash`, the free-tier model as of Sep 2026). Key lives in `.env`, editable from the Settings page. Model name lives in settings, not code.
 - Tests: pytest, for core code.
-- Launch: `uv run python -m eps_runcoach`. Later packaged with PyInstaller.
+- Launch (dev): `uv run python -m eps_runcoach`.
+- Launch (packaged): the desktop shortcut, or `dist\EPS_RunCoach\EPS_RunCoach.exe` directly.
+
+## Packaging
+- Built with PyInstaller from `eps_runcoach.spec` (onedir, not onefile — starts faster and is more reliable with the numpy/matplotlib stack; a desktop shortcut to the exe inside the output folder works the same either way).
+- Rebuild with: `uv run pyinstaller eps_runcoach.spec --noconfirm`. Output goes to `dist/EPS_RunCoach/`. Safe to re-run any time — I expect to rebuild this regularly as the app changes, and the data location below is stable across rebuilds.
+- `core/app_paths.py` detects `sys.frozen` (set by PyInstaller) to decide where data lives: the project's `data/` folder in dev, or `%APPDATA%\EPS RunCoach\` when packaged (database, `.env`, and backups all follow from there). Never hardcode a data path elsewhere — always go through `app_paths`.
+- The desktop shortcut ("EPS RunCoach.lnk") points at `dist\EPS_RunCoach\EPS_RunCoach.exe` — it doesn't need recreating after a rebuild, since the exe's path and name don't change.
+- App icon: `assets/icon.ico` (also `assets/icon.png`) — currently a generated placeholder (blue circle, "R"), swap the file for a real logo whenever there is one; no code changes needed elsewhere.
 
 ## Architecture — the most important rule
 Three layers, dependencies point downwards only:
@@ -36,23 +44,31 @@ Core must be reusable unchanged in a future Streamlit or Kivy app. If a feature 
 ## Structure
 ```
 eps_runcoach/
-  __main__.py          # entry point: python -m runcoach
+  __main__.py           # entry point: python -m eps_runcoach (launches the UI)
   core/
-    fit_import.py      # FIT parsing, GPS stripping, sport classification
-    db.py              # ALL SQL lives here; schema + migrations
-    importer.py        # inbox/folder import, dedupe by file hash, backups
-    metrics.py         # zones, TRIMP, sRPE, fitness/fatigue/form, 5k estimate
-    settings.py        # read/write user settings
+    app_paths.py        # dev vs packaged data/.env/resource locations (sys.frozen)
+    fit_import.py       # FIT parsing, GPS stripping, sport classification
+    db.py                # ALL SQL lives here; schema + migrations
+    importer.py         # inbox/folder import, dedupe by file hash, backups
+    metrics.py           # zones, TRIMP, sRPE, fitness/fatigue/form, 5k estimate
+    training_data.py    # aggregates sessions into a TrainingSnapshot (Dashboard + coach share this)
+    settings.py         # read/write user settings
+    formatting.py       # date/duration/pace display helpers (core, not ui_tk - the coach needs them too)
+    export.py           # export every table to CSV
     coach/
-      base.py          # provider interface
+      base.py          # provider interface + CoachError types
       gemini.py        # Gemini provider
+      api_key.py       # reads/writes the API key in .env
       context.py       # builds the compact training summary sent to the AI
+      request.py       # orchestrates a coaching request: context -> provider -> save
       system_prompt.md # coach instructions (editable by me)
   charts/              # functions returning matplotlib Figures
-  ui_tk/               # windows, pages, dialogs
+  ui_tk/               # windows, pages, dialogs (app.py + pages/)
 scripts/               # command-line utilities
 tests/
-data/                  # database + backups — NEVER commit
+assets/                # icon.ico / icon.png - bundled into the packaged exe
+eps_runcoach.spec      # PyInstaller build config
+data/                  # dev-only database + backups — NEVER commit
 sample_data/           # my FIT files — NEVER commit
 ```
 
@@ -77,4 +93,4 @@ sample_data/           # my FIT files — NEVER commit
 - Fitness = 42-day exponentially weighted load; fatigue = 7-day; form = fitness − fatigue.
 
 ## Current status
-Phase 1 — project setup and reading FIT files. (Update this line as phases are completed.)
+Phase 7 complete — packaged as a Windows app (PyInstaller, desktop shortcut, AppData storage, app icon, back up now, export to CSV). All Build Plan phases done; remaining work is the "Nice-to-haves" list and the per-lap distance calibration note above.

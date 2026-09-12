@@ -10,9 +10,10 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+from eps_runcoach.core import app_paths
 from eps_runcoach.core.fit_import import Sample, SessionSummary, SplitSummary
 
-DEFAULT_DB_PATH = Path("data/eps_runcoach.db")
+DEFAULT_DB_PATH = app_paths.get_data_dir() / "eps_runcoach.db"
 MAX_BACKUPS = 10
 
 # Each migration is (version, sql). Applied once, in order, each in its own

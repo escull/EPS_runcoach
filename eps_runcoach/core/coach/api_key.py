@@ -10,7 +10,9 @@ from pathlib import Path
 
 from dotenv import get_key, set_key
 
-ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
+from eps_runcoach.core import app_paths
+
+ENV_PATH = app_paths.get_env_path()
 PLACEHOLDER = "paste-your-key-here"
 
 
