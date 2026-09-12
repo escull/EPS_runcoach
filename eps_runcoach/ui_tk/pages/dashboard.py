@@ -43,7 +43,10 @@ class DashboardPage(tb.Frame):
         canvas.bind("<Configure>", lambda e: canvas.itemconfigure(body_window, width=e.width))
         canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-e.delta / 120), "units"))
 
-        tb.Label(body, text="Dashboard", font=("Segoe UI", 16, "bold")).pack(anchor="w", padx=16, pady=(16, 8))
+        title_row = tb.Frame(body)
+        title_row.pack(fill="x", padx=16, pady=(16, 8))
+        tb.Label(title_row, text="Dashboard", font=("Segoe UI", 16, "bold")).pack(side="left")
+        tb.Button(title_row, text="Refresh", command=self.refresh, bootstyle="secondary").pack(side="right")
 
         self.content_frame = tb.Frame(body)
         self.content_frame.pack(fill="both", expand=True)

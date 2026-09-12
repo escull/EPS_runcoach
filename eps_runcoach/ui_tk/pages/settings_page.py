@@ -5,6 +5,7 @@ import ttkbootstrap as tb
 
 from eps_runcoach.core import db
 from eps_runcoach.core import settings as core_settings
+from eps_runcoach.core.coach.api_key import get_api_key, set_api_key
 from eps_runcoach.core.formatting import format_duration, parse_mmss_to_seconds
 
 
@@ -52,6 +53,12 @@ class SettingsPage(tb.Frame):
         self.ai_model_var = tk.StringVar()
         tb.Entry(ai_model_row, textvariable=self.ai_model_var, width=25).pack(side="left", padx=8)
 
+        api_key_row = tb.Frame(self)
+        api_key_row.pack(fill="x", padx=16, pady=8)
+        tb.Label(api_key_row, text="Gemini API key:", width=16, anchor="w").pack(side="left")
+        self.api_key_var = tk.StringVar()
+        tb.Entry(api_key_row, textvariable=self.api_key_var, width=40, show="*").pack(side="left", padx=8)
+
         tb.Button(self, text="Save", command=self._save, bootstyle="primary").pack(anchor="w", padx=16, pady=(8, 0))
 
         self.status_label = tb.Label(self, text="")
@@ -81,6 +88,8 @@ class SettingsPage(tb.Frame):
             core_settings.get_setting(conn, core_settings.AI_MODEL_NAME_KEY, default=core_settings.DEFAULT_AI_MODEL_NAME)
         )
 
+        self.api_key_var.set(get_api_key())
+
         self.status_label.configure(text="")
 
     def _browse(self) -> None:
@@ -100,4 +109,5 @@ class SettingsPage(tb.Frame):
         core_settings.set_setting(conn, core_settings.RESTING_HEART_RATE_KEY, self.resting_hr_var.get())
         core_settings.set_setting(conn, core_settings.GOAL_5K_SECONDS_KEY, str(goal_seconds))
         core_settings.set_setting(conn, core_settings.AI_MODEL_NAME_KEY, self.ai_model_var.get())
+        set_api_key(self.api_key_var.get())
         self.status_label.configure(text="Saved.", bootstyle="default")

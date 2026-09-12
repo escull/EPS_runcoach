@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import queue
+import sqlite3
 import threading
 from pathlib import Path
 from tkinter import messagebox
@@ -12,7 +13,9 @@ import ttkbootstrap as tb
 
 from eps_runcoach.core import db
 from eps_runcoach.core.coach.base import CoachError
+from eps_runcoach.core.coach.request import request_insights as run_insights_request
 from eps_runcoach.core.coach.request import request_review
+from eps_runcoach.ui_tk.pages.ai_insights import AIInsightsPage
 from eps_runcoach.ui_tk.pages.dashboard import DashboardPage
 from eps_runcoach.ui_tk.pages.import_page import ImportPage
 from eps_runcoach.ui_tk.pages.niggles import NigglesPage
@@ -25,6 +28,7 @@ PAGES = [
     ("Sessions", SessionsPage),
     ("Import", ImportPage),
     ("Niggles", NigglesPage),
+    ("AI Insights", AIInsightsPage),
     ("Settings", SettingsPage),
 ]
 
@@ -80,17 +84,30 @@ class App(tb.Window):
         SessionDetailWindow(app=self, session_id=session_id)
 
     def request_coaching(self, session_id: int, on_done: Callable[[], None] | None = None) -> None:
-        """Ask the AI coach to review a session, in a background thread
-        using its own database connection (sqlite3 connections aren't
-        safe to share across threads). Errors show as a friendly popup
-        rather than crashing; nothing is saved if the request fails.
+        """Ask the AI coach to review one session (Session Detail's
+        Regenerate button). See _run_coach_task for the threading/error
+        handling this shares with request_insights.
+        """
+        self._run_coach_task(lambda conn: request_review(conn, session_id), on_done)
+
+    def request_insights(self, on_done: Callable[[], None] | None = None) -> None:
+        """Ask the AI coach for a holistic catch-up review covering
+        everything since it was last consulted (the AI Insights page).
+        """
+        self._run_coach_task(lambda conn: run_insights_request(conn), on_done)
+
+    def _run_coach_task(self, work: Callable[[sqlite3.Connection], str], on_done: Callable[[], None] | None) -> None:
+        """Run a coach request in a background thread using its own
+        database connection (sqlite3 connections aren't safe to share
+        across threads). Errors show as a friendly popup rather than
+        crashing; nothing is saved if the request fails.
         """
         result_queue: queue.Queue = queue.Queue()
 
         def run() -> None:
             conn = db.get_connection(self.db_path)
             try:
-                request_review(conn, session_id)
+                work(conn)
                 result_queue.put(None)
             except CoachError as exc:
                 result_queue.put(exc)

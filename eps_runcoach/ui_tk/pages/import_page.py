@@ -88,6 +88,10 @@ class ImportPage(tb.Frame):
         if sessions_page is not None:
             sessions_page.refresh()
 
+        dashboard_page = self.app.pages.get("Dashboard")
+        if dashboard_page is not None:
+            dashboard_page.refresh()
+
         self._start_how_did_it_go_flow([session_id for _name, session_id in summary.imported])
 
     def _start_how_did_it_go_flow(self, session_ids: list[int]) -> None:

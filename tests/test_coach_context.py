@@ -69,6 +69,23 @@ def test_build_context_excludes_sessions_outside_the_recent_window(tmp_path):
     assert "(no sessions in this window)" in context
 
 
+def test_build_context_since_overrides_the_default_window():
+    conn = db.get_connection(":memory:")
+    db.insert_session(
+        conn,
+        make_summary(start_time=datetime(2026, 8, 1, tzinfo=timezone.utc), source_file="old.fit"),
+        file_hash="old",
+        session_type="run",
+    )
+
+    # Would be excluded by the default 10-day window, but "since" reaches back further
+    context = build_context(conn, as_of=date(2026, 9, 10), since=date(2026, 7, 1))
+
+    assert "since 01/07/2026" in context
+    assert "(no sessions in this window)" not in context
+    assert "01/08/2026" in context
+
+
 def test_build_context_never_contains_gps_or_filename():
     # Static invariant check: nothing in fit_import/db exposes raw filenames
     # or GPS to the text summary - describe_session only pulls from

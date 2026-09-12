@@ -425,3 +425,10 @@ def get_latest_ai_review(conn: sqlite3.Connection) -> sqlite3.Row | None:
     Dashboard's "Latest advice" panel.
     """
     return conn.execute("SELECT * FROM ai_reviews ORDER BY created_at DESC, id DESC LIMIT 1").fetchone()
+
+
+def get_all_ai_reviews(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Every review ever generated, newest first - used for the AI
+    Insights page's history list.
+    """
+    return conn.execute("SELECT * FROM ai_reviews ORDER BY created_at DESC, id DESC").fetchall()

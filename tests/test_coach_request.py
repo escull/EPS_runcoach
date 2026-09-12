@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 import pytest
 
 from eps_runcoach.core import db
-from eps_runcoach.core.coach.base import CoachConnectionError, CoachProvider
-from eps_runcoach.core.coach.request import request_review
+from eps_runcoach.core.coach.base import CoachConnectionError, CoachError, CoachProvider
+from eps_runcoach.core.coach.request import request_insights, request_review
 from eps_runcoach.core.fit_import import SessionSummary
 
 
@@ -67,3 +67,43 @@ def test_request_review_propagates_error_and_saves_nothing(tmp_path):
         request_review(conn, session_id, provider=fake)
 
     assert db.get_latest_ai_review_for_session(conn, session_id) is None
+
+
+def test_request_insights_requires_at_least_one_session(tmp_path):
+    conn = db.get_connection(tmp_path / "test.db")
+    fake = FakeProvider(response="shouldn't be called")
+
+    with pytest.raises(CoachError):
+        request_insights(conn, provider=fake)
+
+    assert fake.received_context is None
+
+
+def test_request_insights_saves_against_most_recent_session(tmp_path):
+    conn = db.get_connection(tmp_path / "test.db")
+    older_id = db.insert_session(
+        conn, make_summary(start_time=datetime(2026, 9, 1, tzinfo=timezone.utc)), file_hash="a", session_type="run"
+    )
+    newer_id = db.insert_session(
+        conn, make_summary(start_time=datetime(2026, 9, 5, tzinfo=timezone.utc)), file_hash="b", session_type="run"
+    )
+    fake = FakeProvider(response="Here's how the last few sessions went overall.")
+
+    result = request_insights(conn, provider=fake)
+
+    assert result == "Here's how the last few sessions went overall."
+    assert db.get_latest_ai_review_for_session(conn, newer_id) is not None
+    assert db.get_latest_ai_review_for_session(conn, older_id) is None
+
+
+def test_request_insights_uses_since_last_review_as_the_window(tmp_path):
+    conn = db.get_connection(tmp_path / "test.db")
+    session_id = db.insert_session(
+        conn, make_summary(start_time=datetime(2026, 9, 1, tzinfo=timezone.utc)), file_hash="a", session_type="run"
+    )
+    db.insert_ai_review(conn, session_id, provider="gemini", model="gemini-3.8-flash", review_text="first check-in")
+
+    fake = FakeProvider(response="second check-in")
+    request_insights(conn, provider=fake)
+
+    assert "since" in fake.received_context.lower()

@@ -18,7 +18,12 @@ RECENT_SESSION_DAYS = 10
 WEEKLY_TOTALS_WEEKS = 4
 
 
-def build_context(conn: sqlite3.Connection, as_of: date | None = None) -> str:
+def build_context(conn: sqlite3.Connection, as_of: date | None = None, since: date | None = None) -> str:
+    """Build the text summary. By default, the session-detail section
+    covers the last RECENT_SESSION_DAYS days; pass `since` to cover a
+    specific window instead (e.g. everything since the coach was last
+    consulted, for the AI Insights page's holistic "catch-up" review).
+    """
     as_of = as_of or date.today()
 
     max_hr_raw = core_settings.get_setting(conn, core_settings.MAX_HEART_RATE_KEY)
@@ -29,6 +34,9 @@ def build_context(conn: sqlite3.Connection, as_of: date | None = None) -> str:
     snapshot = None
     if max_hr_raw and resting_hr_raw:
         snapshot = training_data.build_snapshot(conn, float(resting_hr_raw), float(max_hr_raw), as_of=as_of)
+
+    session_window_start = since if since is not None else as_of - timedelta(days=RECENT_SESSION_DAYS)
+    window_label = f"since {format_date(session_window_start.isoformat())}" if since is not None else "from the last 10 days"
 
     lines: list[str] = []
     lines.append("=== Goal and settings ===")
@@ -41,8 +49,8 @@ def build_context(conn: sqlite3.Connection, as_of: date | None = None) -> str:
     lines.extend(_weekly_totals_lines(snapshot, as_of))
 
     lines.append("")
-    lines.append(f"=== Sessions from the last {RECENT_SESSION_DAYS} days ===")
-    lines.extend(_recent_session_lines(conn, as_of))
+    lines.append(f"=== Sessions {window_label} ===")
+    lines.extend(_recent_session_lines(conn, session_window_start))
 
     lines.append("")
     lines.append("=== Current training state ===")
@@ -71,8 +79,7 @@ def _weekly_totals_lines(snapshot: training_data.TrainingSnapshot | None, as_of:
     return lines
 
 
-def _recent_session_lines(conn: sqlite3.Connection, as_of: date) -> list[str]:
-    cutoff = as_of - timedelta(days=RECENT_SESSION_DAYS)
+def _recent_session_lines(conn: sqlite3.Connection, cutoff: date) -> list[str]:
     sessions = db.get_all_sessions(conn)
     recent = [s for s in sessions if training_data.parse_session_date(s["start_time"]) >= cutoff]
 

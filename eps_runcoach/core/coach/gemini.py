@@ -2,23 +2,19 @@
 
 from __future__ import annotations
 
-import os
-
-from dotenv import load_dotenv
 from google import genai
 from google.genai import errors, types
 
+from eps_runcoach.core.coach.api_key import get_api_key
 from eps_runcoach.core.coach.base import CoachConnectionError, CoachError, CoachProvider, CoachRateLimitError
-
-load_dotenv()
 
 
 class GeminiProvider(CoachProvider):
     def __init__(self, model: str):
         self.model = model
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key or api_key == "paste-your-key-here":
-            raise CoachError("No Gemini API key configured - add one to your .env file.")
+        api_key = get_api_key()
+        if not api_key:
+            raise CoachError("No Gemini API key configured - add one on the Settings page.")
         self._client = genai.Client(api_key=api_key)
 
     def generate_review(self, context: str, system_prompt: str) -> str:

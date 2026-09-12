@@ -64,7 +64,7 @@ sample_data/           # my FIT files — NEVER commit
 
 ## Non-negotiable rules
 - **Privacy:** Discard all GPS coordinates on import; never store them. Never send raw files, GPS, or personal identifiers to the AI — only summarised stats and my notes.
-- **Secrets:** The API key lives only in `.env`, which is git-ignored. Never hard-code or print it. Check before any push that no secrets, `data/` or `sample_data/` are included.
+- **Secrets:** The API key lives only in `.env`, which is git-ignored. Never hard-code or print it. The Settings page may offer a field for it, but it must write straight through to `.env` (via python-dotenv) — never into the SQLite database. Never encrypt or hash it: this is a single-user local app, hashing would break authentication (the raw key must be sent to the API), and the real risk (accidentally committing it to git) is already handled by `.gitignore`. Check before any push that no secrets, `data/` or `sample_data/` are included.
 - **Data safety:** Back up the database before imports and migrations. Never delete my data without asking.
 - **Safety in coaching:** The coach must be conservative about pain and injury, never advise pushing through pain, and suggest a physio for persistent or worsening niggles.
 - **Units and language:** Kilometres, min/km pace, UK English, dates as DD/MM/YYYY.
