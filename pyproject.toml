@@ -1,7 +1,7 @@
 [project]
 name = "eps-runcoach"
 version = "0.1.0"
-description = "Add your description here"
+description = "A private, single-user desktop app for recreational runners: FIT import, training metrics, and an AI coach."
 readme = "README.md"
 authors = [
     { name = "escull_h", email = "edwinscull@gmail.com" }
