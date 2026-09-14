@@ -52,6 +52,45 @@ def test_build_context_includes_goal_and_recent_session_detail(tmp_path):
     assert "Fitness:" in context
 
 
+def test_build_context_includes_recovery_time_and_training_effect_when_present(tmp_path):
+    conn = db.get_connection(tmp_path / "test.db")
+    settings.set_setting(conn, settings.MAX_HEART_RATE_KEY, "190")
+    settings.set_setting(conn, settings.RESTING_HEART_RATE_KEY, "60")
+
+    db.insert_session(
+        conn,
+        make_summary(recovery_time_s=28980.0, total_training_effect=3.0),
+        file_hash="hrm",
+        session_type="run",
+    )
+
+    context = build_context(conn, as_of=date(2026, 9, 10))
+
+    assert "recovery time 8h" in context
+    assert "training effect 3.0/5.0" in context
+
+
+def test_build_context_reports_no_weight_logged_by_default(tmp_path):
+    conn = db.get_connection(tmp_path / "test.db")
+
+    context = build_context(conn, as_of=date(2026, 9, 10))
+
+    assert "(no weight logged yet)" in context
+
+
+def test_build_context_includes_weight_trend_over_four_weeks(tmp_path):
+    conn = db.get_connection(tmp_path / "test.db")
+    settings.set_setting(conn, settings.HEIGHT_CM_KEY, "180")
+    db.insert_body_metric(conn, "2026-08-01", weight_kg=76.0)  # more than 4 weeks before as_of
+    db.insert_body_metric(conn, "2026-09-08", weight_kg=74.9)
+
+    context = build_context(conn, as_of=date(2026, 9, 10))
+
+    assert "Height: 180 cm" in context
+    assert "Weight: 74.9 kg" in context
+    assert "Down 1.1 kg over the last 4 weeks" in context
+
+
 def test_build_context_excludes_sessions_outside_the_recent_window(tmp_path):
     conn = db.get_connection(tmp_path / "test.db")
     settings.set_setting(conn, settings.MAX_HEART_RATE_KEY, "190")

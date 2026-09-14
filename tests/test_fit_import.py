@@ -6,6 +6,8 @@ from eps_runcoach.core.fit_import import parse_fit_file
 
 SAMPLE_DIR = Path(__file__).parent.parent / "sample_data"
 TREADMILL_FIT = SAMPLE_DIR / "Treadmill_2026-09-08T18_29_35.fit"
+TREADMILL_WITH_HRM_FIT = SAMPLE_DIR / "Treadmill_2026-09-14T18_16_37.fit"
+CYCLING_FIT = SAMPLE_DIR / "Cycling_2026-08-16T13_11_22.fit"
 
 
 def test_parse_fit_file_extracts_summary():
@@ -66,3 +68,30 @@ def test_parse_fit_file_never_reads_gps_fields():
     for obj in [parsed.summary, *parsed.splits, *parsed.samples]:
         field_names = vars(obj).keys()
         assert not any("lat" in name or "long" in name for name in field_names)
+
+
+def test_parse_fit_file_extracts_recovery_and_training_effect_regardless_of_sport():
+    # recovery_time and total_training_effect are computed by the watch from
+    # heart rate alone, so they show up even on a non-running session.
+    parsed = parse_fit_file(CYCLING_FIT)
+    summary = parsed.summary
+
+    assert summary.recovery_time_s == 6180
+    assert summary.total_training_effect == pytest.approx(1.6)
+
+
+def test_parse_fit_file_estimated_vo2_max_is_running_specific():
+    # Suunto only estimates VO2 max for running activities - a cycling
+    # session shouldn't claim a running fitness number it doesn't have.
+    parsed = parse_fit_file(CYCLING_FIT)
+
+    assert parsed.summary.estimated_vo2_max is None
+
+
+def test_parse_fit_file_extracts_hrm_derived_fields_for_a_run():
+    parsed = parse_fit_file(TREADMILL_WITH_HRM_FIT)
+    summary = parsed.summary
+
+    assert summary.estimated_vo2_max == pytest.approx(42.1, abs=0.1)
+    assert summary.recovery_time_s == 28980
+    assert summary.total_training_effect == pytest.approx(3.0)

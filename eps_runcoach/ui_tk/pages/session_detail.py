@@ -9,7 +9,16 @@ from eps_runcoach.charts.session_charts import heart_rate_chart, pace_chart
 from eps_runcoach.core import db, metrics
 from eps_runcoach.core import settings as core_settings
 from eps_runcoach.core.fit_import import SAMPLE_INTERVAL_S
-from eps_runcoach.core.formatting import format_date, format_distance, format_duration, format_hr, format_pace
+from eps_runcoach.core.formatting import (
+    format_date,
+    format_distance,
+    format_duration,
+    format_hr,
+    format_pace,
+    format_recovery_time,
+    format_training_effect,
+    format_vo2_max,
+)
 from eps_runcoach.ui_tk.pages.how_did_it_go import HowDidItGoDialog
 
 SESSION_TYPES = ["run", "strength", "other"]
@@ -64,8 +73,24 @@ class SessionDetailWindow(tb.Toplevel):
         )
         tb.Label(header, text=stats).grid(row=1, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
+        next_row = 2
+        has_hrm_stats = any(
+            session[key] is not None
+            for key in ("estimated_vo2_max", "recovery_time_s", "total_training_effect")
+        )
+        if has_hrm_stats:
+            hrm_stats = (
+                f"Est. VO2 max: {format_vo2_max(session['estimated_vo2_max'])}   "
+                f"Recovery: {format_recovery_time(session['recovery_time_s'])}   "
+                f"Training effect: {format_training_effect(session['total_training_effect'])}"
+            )
+            tb.Label(header, text=hrm_stats, bootstyle="secondary").grid(
+                row=next_row, column=0, columnspan=2, sticky="w", pady=(4, 0)
+            )
+            next_row += 1
+
         type_row = tb.Frame(header)
-        type_row.grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        type_row.grid(row=next_row, column=0, columnspan=2, sticky="w", pady=(8, 0))
         tb.Label(type_row, text="Session type:").pack(side="left")
         self.type_var = tk.StringVar(value=session["session_type"])
         combo = tb.Combobox(type_row, textvariable=self.type_var, values=SESSION_TYPES, state="readonly", width=12)

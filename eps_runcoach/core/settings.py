@@ -11,6 +11,7 @@ MAX_HEART_RATE_KEY = "max_heart_rate"
 RESTING_HEART_RATE_KEY = "resting_heart_rate"
 GOAL_5K_SECONDS_KEY = "goal_5k_seconds"
 AI_MODEL_NAME_KEY = "ai_model_name"
+HEIGHT_CM_KEY = "height_cm"
 
 DEFAULT_GOAL_5K_SECONDS = 1500.0  # sub-25 minutes
 DEFAULT_AI_MODEL_NAME = "gemini-3.8-flash"

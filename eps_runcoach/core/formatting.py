@@ -50,6 +50,37 @@ def format_hr(bpm: int | None) -> str:
     return f"{bpm} bpm"
 
 
+def format_vo2_max(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value:.0f} ml/min/kg"
+
+
+def format_recovery_time(seconds: float | None) -> str:
+    if not seconds:
+        return "-"
+    hours = seconds / 3600
+    if hours < 1:
+        return f"{int(seconds / 60)} min"
+    return f"{hours:.0f}h"
+
+
+def format_training_effect(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value:.1f}/5.0"
+
+
+def parse_ddmmyyyy_to_iso_date(text: str) -> str | None:
+    """Parse a "DD/MM/YYYY" string (as typed for a logged date) into an ISO
+    date string. None if the text isn't a valid date.
+    """
+    try:
+        return datetime.strptime(text.strip(), "%d/%m/%Y").date().isoformat()
+    except ValueError:
+        return None
+
+
 def parse_mmss_to_seconds(text: str) -> float | None:
     """Parse a "MM:SS" or "H:MM:SS" string (as typed for a goal time) into
     seconds. None if the text isn't a valid time.

@@ -33,6 +33,9 @@ class SessionSummary:
     total_descent: float | None
     avg_cadence: float | None
     source_file: str
+    estimated_vo2_max: float | None = None
+    recovery_time_s: float | None = None
+    total_training_effect: float | None = None
 
 
 @dataclass
@@ -118,6 +121,14 @@ def _build_summary(session_data: dict[str, object], path: Path) -> SessionSummar
         total_descent=session_data.get("total_descent"),
         avg_cadence=session_data.get("avg_running_cadence"),
         source_file=path.name,
+        # Firstbeat-style analytics computed by the watch itself. Present on
+        # sessions with enough heart rate data regardless of sensor, though
+        # a chest strap (e.g. Polar H10) gives more accurate numbers than a
+        # wrist optical sensor. estimated_vo2_max is running-specific - None
+        # for other sports.
+        estimated_vo2_max=session_data.get("estimated_vo2_max"),
+        recovery_time_s=session_data.get("recovery_time"),
+        total_training_effect=session_data.get("total_training_effect"),
     )
 
 

@@ -42,6 +42,13 @@ class SettingsPage(tb.Frame):
         )
         tb.Label(resting_hr_row, text="bpm").pack(side="left")
 
+        height_row = tb.Frame(self)
+        height_row.pack(fill="x", padx=16, pady=8)
+        tb.Label(height_row, text="Height:", width=16, anchor="w").pack(side="left")
+        self.height_var = tk.StringVar()
+        tb.Spinbox(height_row, from_=100, to=250, textvariable=self.height_var, width=6).pack(side="left", padx=8)
+        tb.Label(height_row, text="cm").pack(side="left")
+
         goal_row = tb.Frame(self)
         goal_row.pack(fill="x", padx=16, pady=8)
         tb.Label(goal_row, text="5k goal (mm:ss):", width=16, anchor="w").pack(side="left")
@@ -93,6 +100,8 @@ class SettingsPage(tb.Frame):
             self.max_hr_var.set(max_hr)
             self.max_hr_hint_label.configure(text="")
 
+        self.height_var.set(core_settings.get_setting(conn, core_settings.HEIGHT_CM_KEY, default=""))
+
         goal_seconds = core_settings.get_setting(conn, core_settings.GOAL_5K_SECONDS_KEY)
         goal_seconds = float(goal_seconds) if goal_seconds else core_settings.DEFAULT_GOAL_5K_SECONDS
         self.goal_var.set(format_duration(goal_seconds))
@@ -121,6 +130,7 @@ class SettingsPage(tb.Frame):
         core_settings.set_setting(conn, core_settings.INBOX_FOLDER_KEY, self.inbox_var.get())
         core_settings.set_setting(conn, core_settings.MAX_HEART_RATE_KEY, self.max_hr_var.get())
         core_settings.set_setting(conn, core_settings.RESTING_HEART_RATE_KEY, self.resting_hr_var.get())
+        core_settings.set_setting(conn, core_settings.HEIGHT_CM_KEY, self.height_var.get())
         core_settings.set_setting(conn, core_settings.GOAL_5K_SECONDS_KEY, str(goal_seconds))
         core_settings.set_setting(conn, core_settings.AI_MODEL_NAME_KEY, self.ai_model_var.get())
         set_api_key(self.api_key_var.get())

@@ -12,7 +12,15 @@ from datetime import date, timedelta
 
 from eps_runcoach.core import db, training_data
 from eps_runcoach.core import settings as core_settings
-from eps_runcoach.core.formatting import format_date, format_distance, format_duration, format_hr, format_pace
+from eps_runcoach.core.formatting import (
+    format_date,
+    format_distance,
+    format_duration,
+    format_hr,
+    format_pace,
+    format_recovery_time,
+    format_training_effect,
+)
 
 RECENT_SESSION_DAYS = 10
 WEEKLY_TOTALS_WEEKS = 4
@@ -38,11 +46,19 @@ def build_context(conn: sqlite3.Connection, as_of: date | None = None, since: da
     session_window_start = since if since is not None else as_of - timedelta(days=RECENT_SESSION_DAYS)
     window_label = f"since {format_date(session_window_start.isoformat())}" if since is not None else "from the last 10 days"
 
+    height_raw = core_settings.get_setting(conn, core_settings.HEIGHT_CM_KEY)
+
     lines: list[str] = []
     lines.append("=== Goal and settings ===")
     lines.append(f"5k goal: {format_duration(goal_seconds)}")
     lines.append(f"Max heart rate: {max_hr_raw} bpm" if max_hr_raw else "Max heart rate: not set")
     lines.append(f"Resting heart rate: {resting_hr_raw} bpm" if resting_hr_raw else "Resting heart rate: not set")
+    if height_raw:
+        lines.append(f"Height: {height_raw} cm")
+
+    lines.append("")
+    lines.append("=== Body ===")
+    lines.extend(_weight_trend_lines(conn, as_of))
 
     lines.append("")
     lines.append(f"=== Weekly totals (last {WEEKLY_TOTALS_WEEKS} weeks) ===")
@@ -57,6 +73,27 @@ def build_context(conn: sqlite3.Connection, as_of: date | None = None, since: da
     lines.extend(_training_state_lines(snapshot))
 
     return "\n".join(lines)
+
+
+def _weight_trend_lines(conn: sqlite3.Connection, as_of: date) -> list[str]:
+    weighed_rows = [row for row in db.get_all_body_metrics(conn) if row["weight_kg"] is not None]
+    if not weighed_rows:
+        return ["(no weight logged yet)"]
+
+    latest = weighed_rows[-1]
+    lines = [f"Weight: {latest['weight_kg']:.1f} kg (as of {format_date(latest['recorded_date'])})"]
+
+    window_start = as_of - timedelta(weeks=WEEKLY_TOTALS_WEEKS)
+    earlier_in_window = [row for row in weighed_rows if date.fromisoformat(row["recorded_date"]) <= window_start]
+    if earlier_in_window:
+        change = latest["weight_kg"] - earlier_in_window[-1]["weight_kg"]
+        if abs(change) < 0.05:
+            lines.append(f"No real change over the last {WEEKLY_TOTALS_WEEKS} weeks")
+        else:
+            direction = "up" if change > 0 else "down"
+            lines.append(f"{direction.capitalize()} {abs(change):.1f} kg over the last {WEEKLY_TOTALS_WEEKS} weeks")
+
+    return lines
 
 
 def _weekly_totals_lines(snapshot: training_data.TrainingSnapshot | None, as_of: date) -> list[str]:
@@ -117,6 +154,10 @@ def _describe_session(conn: sqlite3.Connection, session: sqlite3.Row) -> str:
         parts.append(f"pace {format_pace(session['avg_pace_min_per_km'])}")
     if session["avg_heart_rate"]:
         parts.append(f"avg HR {format_hr(session['avg_heart_rate'])}")
+    if session["recovery_time_s"]:
+        parts.append(f"recovery time {format_recovery_time(session['recovery_time_s'])}")
+    if session["total_training_effect"] is not None:
+        parts.append(f"training effect {format_training_effect(session['total_training_effect'])}")
 
     note = db.get_note(conn, session["id"])
     if note and note["rpe"] is not None:

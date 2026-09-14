@@ -8,7 +8,7 @@ import csv
 import sqlite3
 from pathlib import Path
 
-TABLES = ["sessions", "splits", "samples", "notes", "niggles", "settings", "ai_reviews"]
+TABLES = ["sessions", "splits", "samples", "notes", "niggles", "body_metrics", "settings", "ai_reviews"]
 
 
 def export_all_to_csv(conn: sqlite3.Connection, output_dir: str | Path) -> list[Path]:

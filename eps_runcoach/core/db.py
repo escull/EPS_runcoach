@@ -103,6 +103,28 @@ MIGRATIONS: list[tuple[int, str]] = [
         CREATE INDEX idx_ai_reviews_session_id ON ai_reviews(session_id);
         """,
     ),
+    (
+        2,
+        """
+        ALTER TABLE sessions ADD COLUMN estimated_vo2_max REAL;
+        ALTER TABLE sessions ADD COLUMN recovery_time_s REAL;
+        ALTER TABLE sessions ADD COLUMN total_training_effect REAL;
+        """,
+    ),
+    (
+        3,
+        """
+        CREATE TABLE body_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recorded_date TEXT NOT NULL,
+            weight_kg REAL,
+            body_fat_pct REAL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX idx_body_metrics_recorded_date ON body_metrics(recorded_date);
+        """,
+    ),
 ]
 
 
@@ -316,6 +338,27 @@ def get_all_niggles_with_dates(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def insert_body_metric(
+    conn: sqlite3.Connection,
+    recorded_date: str,
+    weight_kg: float | None,
+    body_fat_pct: float | None = None,
+) -> int:
+    cursor = conn.execute(
+        """
+        INSERT INTO body_metrics (recorded_date, weight_kg, body_fat_pct, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (recorded_date, weight_kg, body_fat_pct, datetime.now(timezone.utc).isoformat()),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
+def get_all_body_metrics(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute("SELECT * FROM body_metrics ORDER BY recorded_date").fetchall()
+
+
 def insert_session(
     conn: sqlite3.Connection,
     summary: SessionSummary,
@@ -329,8 +372,9 @@ def insert_session(
             file_hash, source_file, sport, sub_sport, session_type,
             start_time, duration_s, distance_km, avg_pace_min_per_km,
             avg_heart_rate, max_heart_rate, calories, total_ascent,
-            total_descent, avg_cadence, imported_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            total_descent, avg_cadence, imported_at, estimated_vo2_max,
+            recovery_time_s, total_training_effect
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             file_hash,
@@ -349,6 +393,9 @@ def insert_session(
             summary.total_descent,
             summary.avg_cadence,
             datetime.now(timezone.utc).isoformat(),
+            summary.estimated_vo2_max,
+            summary.recovery_time_s,
+            summary.total_training_effect,
         ),
     )
     conn.commit()

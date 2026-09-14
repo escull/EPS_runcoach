@@ -48,6 +48,7 @@ def test_init_db_creates_all_tables(conn):
         "niggles",
         "settings",
         "ai_reviews",
+        "body_metrics",
     }
     assert expected.issubset(tables)
 
@@ -67,6 +68,16 @@ def test_insert_and_fetch_session(conn):
     assert row["source_file"] == "test.fit"
     assert row["session_type"] == "run"
     assert row["distance_km"] == 5.0
+
+
+def test_insert_session_stores_hrm_derived_fields_when_present(conn):
+    summary = make_summary(estimated_vo2_max=42.1, recovery_time_s=28980.0, total_training_effect=3.0)
+    db.insert_session(conn, summary, file_hash="hrm", session_type="run")
+
+    row = db.get_session_by_hash(conn, "hrm")
+    assert row["estimated_vo2_max"] == 42.1
+    assert row["recovery_time_s"] == 28980.0
+    assert row["total_training_effect"] == 3.0
 
 
 def test_duplicate_file_hash_rejected(conn):
@@ -157,14 +168,61 @@ def test_init_db_backs_up_before_applying_a_new_migration(tmp_path, monkeypatch)
     conn.close()
 
     # Simulate a future migration being added after this database was created.
-    monkeypatch.setattr(db, "MIGRATIONS", db.MIGRATIONS + [(2, "CREATE TABLE extra (id INTEGER PRIMARY KEY);")])
+    # Computed from the real current version rather than hardcoded, so this
+    # test doesn't need updating every time an actual migration is added.
+    next_version = db.MIGRATIONS[-1][0] + 1
+    monkeypatch.setattr(db, "MIGRATIONS", db.MIGRATIONS + [(next_version, "CREATE TABLE extra (id INTEGER PRIMARY KEY);")])
 
     conn = db.get_connection(db_path)
     version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
-    assert version == 2
+    assert version == next_version
     assert db.session_exists(conn, "existing")
 
     assert list(backup_dir.glob("test_*.db"))
+
+
+def test_migration_2_adds_hrm_columns_without_losing_existing_data(tmp_path, monkeypatch):
+    # Simulate a database created before the estimated_vo2_max/recovery_time_s/
+    # total_training_effect columns existed (schema version 1 only), with a
+    # real session already in it, then confirm upgrading to the current
+    # schema keeps that session intact and just adds the new columns as NULL.
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(db, "MIGRATIONS", db.MIGRATIONS[:1])
+
+    conn = db.get_connection(db_path)
+    # Insert with a raw statement matching the old (v1) schema directly -
+    # db.insert_session always targets the current schema, so it can't be
+    # used here to write a row as it would have looked before this migration.
+    conn.execute(
+        """
+        INSERT INTO sessions (
+            file_hash, source_file, sport, sub_sport, session_type,
+            start_time, duration_s, distance_km, avg_pace_min_per_km,
+            avg_heart_rate, max_heart_rate, calories, total_ascent,
+            total_descent, avg_cadence, imported_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "pre-existing", "test.fit", "running", "treadmill", "run",
+            "2026-01-01T00:00:00+00:00", 1500.0, 5.0, 5.0,
+            140, 160, 400, 0.0, 0.0, 80.0, "2026-01-01T00:00:00+00:00",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.undo()  # restore the real, current MIGRATIONS list
+
+    conn = db.get_connection(db_path)
+    version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+    assert version == db.MIGRATIONS[-1][0]
+
+    row = db.get_session_by_hash(conn, "pre-existing")
+    assert row["distance_km"] == 5.0  # original data untouched
+    assert row["estimated_vo2_max"] is None
+    assert row["recovery_time_s"] is None
+    assert row["total_training_effect"] is None
+    assert db.get_all_body_metrics(conn) == []  # new table exists and is queryable, just empty
 
 
 def test_get_session_by_id(conn):
@@ -275,6 +333,18 @@ def test_get_all_niggles_with_dates_orders_newest_session_first(conn):
 
     assert [r["location"] for r in rows] == ["knee", "ankle"]
     assert rows[0]["session_start_time"] == "2026-06-01T00:00:00+00:00"
+
+
+def test_insert_and_get_all_body_metrics_ordered_by_date(conn):
+    db.insert_body_metric(conn, "2026-06-15", weight_kg=75.0)
+    db.insert_body_metric(conn, "2026-06-01", weight_kg=76.2, body_fat_pct=18.5)
+
+    rows = db.get_all_body_metrics(conn)
+
+    assert [r["recorded_date"] for r in rows] == ["2026-06-01", "2026-06-15"]
+    assert rows[0]["weight_kg"] == 76.2
+    assert rows[0]["body_fat_pct"] == 18.5
+    assert rows[1]["body_fat_pct"] is None
 
 
 def test_get_max_observed_heart_rate(conn):

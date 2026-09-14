@@ -17,6 +17,7 @@ from eps_runcoach.core.coach.request import request_insights as run_insights_req
 from eps_runcoach.core.coach.request import request_review
 from eps_runcoach.core.error_log import log_exception
 from eps_runcoach.ui_tk.pages.ai_insights import AIInsightsPage
+from eps_runcoach.ui_tk.pages.body import BodyPage
 from eps_runcoach.ui_tk.pages.dashboard import DashboardPage
 from eps_runcoach.ui_tk.pages.import_page import ImportPage
 from eps_runcoach.ui_tk.pages.niggles import NigglesPage
@@ -29,6 +30,7 @@ PAGES = [
     ("Sessions", SessionsPage),
     ("Import", ImportPage),
     ("Niggles", NigglesPage),
+    ("Body", BodyPage),
     ("AI Insights", AIInsightsPage),
     ("Settings", SettingsPage),
 ]
