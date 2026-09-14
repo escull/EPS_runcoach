@@ -5,7 +5,7 @@
 ; (ISCC.exe eps_runcoach.iss, or open it in the Inno Setup Compiler GUI).
 
 #define MyAppName "EPS RunCoach"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "Edwin Scull"
 #define MyAppExeName "EPS_RunCoach.exe"
 
