@@ -19,6 +19,7 @@ from eps_runcoach.core.formatting import (
     format_training_effect,
     format_vo2_max,
 )
+from eps_runcoach.ui_tk.pages.correct_split_distance import CorrectSplitDistanceDialog
 from eps_runcoach.ui_tk.pages.how_did_it_go import HowDidItGoDialog
 
 SESSION_TYPES = ["run", "strength", "other"]
@@ -46,15 +47,14 @@ class SessionDetailWindow(tb.Toplevel):
         canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-e.delta / 120), "units"))
 
         session = db.get_session(app.conn, session_id)
-        splits = db.get_splits(app.conn, session_id)
-        samples = db.get_samples(app.conn, session_id)
 
         self._build_header(body, session)
         self._build_how_did_it_go_section(body)
         self._build_advice_section(body)
-        self._build_splits_table(body, splits)
-        self._build_zones_section(body, samples)
-        self._build_charts(body, samples)
+
+        self.data_frame = tb.Frame(body)
+        self.data_frame.pack(fill="both", expand=True)
+        self._render_data_section()
 
     def _build_header(self, parent: tb.Frame, session: sqlite3.Row) -> None:
         header = tb.Frame(parent)
@@ -181,6 +181,17 @@ class SessionDetailWindow(tb.Toplevel):
         self.regenerate_button.configure(state="disabled", text="Generating...")
         self.app.request_coaching(self.session_id, on_done=self._render_advice)
 
+    def _render_data_section(self) -> None:
+        for widget in self.data_frame.winfo_children():
+            widget.destroy()
+
+        splits = db.get_splits(self.app.conn, self.session_id)
+        samples = db.get_samples(self.app.conn, self.session_id)
+
+        self._build_splits_table(self.data_frame, splits)
+        self._build_zones_section(self.data_frame, samples)
+        self._build_charts(self.data_frame, samples)
+
     def _build_splits_table(self, parent: tb.Frame, splits: list[sqlite3.Row]) -> None:
         columns = ("split", "distance", "duration", "pace", "avg_hr")
         headings = {"split": "Split", "distance": "Distance", "duration": "Duration", "pace": "Pace", "avg_hr": "Avg HR"}
@@ -202,7 +213,18 @@ class SessionDetailWindow(tb.Toplevel):
                     format_hr(split["avg_heart_rate"]),
                 ),
             )
-        tree.pack(fill="x", padx=16, pady=(0, 16))
+        tree.pack(fill="x", padx=16, pady=(0, 8))
+
+        if splits:
+            tb.Button(
+                parent,
+                text="Correct a split's distance...",
+                command=lambda: self._open_correct_split_distance(splits),
+                bootstyle="secondary",
+            ).pack(anchor="w", padx=16, pady=(0, 16))
+
+    def _open_correct_split_distance(self, splits: list[sqlite3.Row]) -> None:
+        CorrectSplitDistanceDialog(self.app, self.session_id, splits, on_done=self._render_data_section)
 
     def _build_zones_section(self, parent: tb.Frame, samples: list[sqlite3.Row]) -> None:
         max_hr_raw = core_settings.get_setting(self.app.conn, core_settings.MAX_HEART_RATE_KEY)

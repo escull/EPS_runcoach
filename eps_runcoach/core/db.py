@@ -253,6 +253,85 @@ def get_samples(conn: sqlite3.Connection, session_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def correct_split_distance(
+    conn: sqlite3.Connection, session_id: int, split_index: int, new_distance_km: float
+) -> None:
+    """Rescale one split's recorded distance to a known-true distance, for
+    treadmill/machine sessions where the device's own distance estimate was
+    badly off and only the session-level total got corrected afterwards
+    (that correction never reaches the individual laps or samples).
+
+    Samples within the split's time range are rescaled by the same ratio as
+    the distance correction (their speed scales identically, since the time
+    base doesn't change). Samples after the split are shifted by a constant
+    offset - not scaled - so the running distance total stays continuous
+    into the next, uncorrected lap. Backs up the database first, since this
+    permanently overwrites imported data.
+    """
+    backup_database(get_db_path(conn))
+
+    splits = get_splits(conn, session_id)
+    target = next((s for s in splits if s["split_index"] == split_index), None)
+    if target is None:
+        raise ValueError(f"Session {session_id} has no split {split_index}")
+
+    old_distance_km = target["distance_km"]
+    if not old_distance_km:
+        raise ValueError("Can't rescale a split with no recorded distance")
+
+    scale_factor = new_distance_km / old_distance_km
+    lap_start_s = sum((s["duration_s"] or 0) for s in splits if s["split_index"] < split_index)
+    lap_end_s = lap_start_s + (target["duration_s"] or 0)
+
+    samples = get_samples(conn, session_id)
+
+    # The last known distance reading before/at the lap boundaries, used as
+    # the anchor points for rescaling within the lap and offsetting after it.
+    cum_before = 0.0
+    old_lap_end_distance = 0.0
+    for sample in samples:
+        if sample["distance_km"] is None:
+            continue
+        if sample["elapsed_s"] < lap_start_s:
+            cum_before = sample["distance_km"]
+        if sample["elapsed_s"] < lap_end_s:
+            old_lap_end_distance = sample["distance_km"]
+
+    new_lap_end_distance = cum_before + (old_lap_end_distance - cum_before) * scale_factor
+    offset = new_lap_end_distance - old_lap_end_distance
+
+    sample_updates = []
+    for sample in samples:
+        if sample["elapsed_s"] < lap_start_s:
+            continue
+
+        old_d = sample["distance_km"]
+        old_speed = sample["speed_m_s"]
+
+        if sample["elapsed_s"] < lap_end_s:
+            new_d = cum_before + (old_d - cum_before) * scale_factor if old_d is not None else None
+            new_speed = old_speed * scale_factor if old_speed is not None else None
+        else:
+            new_d = old_d + offset if old_d is not None else None
+            new_speed = old_speed
+
+        sample_updates.append((new_d, new_speed, sample["id"]))
+
+    if sample_updates:
+        conn.executemany(
+            "UPDATE samples SET distance_km = ?, speed_m_s = ? WHERE id = ?",
+            sample_updates,
+        )
+
+    duration_s = target["duration_s"]
+    new_pace = (duration_s / 60) / new_distance_km if duration_s and new_distance_km else None
+    conn.execute(
+        "UPDATE splits SET distance_km = ?, avg_pace_min_per_km = ? WHERE id = ?",
+        (new_distance_km, new_pace, target["id"]),
+    )
+    conn.commit()
+
+
 def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
     row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
     return row["value"] if row is not None else default

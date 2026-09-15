@@ -113,6 +113,87 @@ def test_insert_splits_and_samples(conn):
     assert stored_samples[1]["heart_rate"] == 132
 
 
+def test_correct_split_distance_rescales_within_lap_and_shifts_after(conn):
+    # Three 100s laps at a constant 2.0 m/s (0.002 km/s), sampled every 10s -
+    # split 2 (100-200s) gets corrected from 0.2km to 0.3km (1.5x).
+    summary = make_summary()
+    session_id = db.insert_session(conn, summary, file_hash="correct", session_type="run")
+    db.insert_splits(
+        conn,
+        session_id,
+        [
+            SplitSummary(split_index=1, distance_km=0.2, duration_s=100.0, avg_pace_min_per_km=8.33, avg_heart_rate=130),
+            SplitSummary(split_index=2, distance_km=0.2, duration_s=100.0, avg_pace_min_per_km=8.33, avg_heart_rate=140),
+            SplitSummary(split_index=3, distance_km=0.2, duration_s=100.0, avg_pace_min_per_km=8.33, avg_heart_rate=135),
+        ],
+    )
+    samples = [
+        Sample(elapsed_s=float(t), distance_km=2.0 * t / 1000, speed_m_s=2.0, heart_rate=140, cadence=80.0, altitude_m=0.0)
+        for t in range(0, 301, 10)
+    ]
+    db.insert_samples(conn, session_id, samples)
+
+    db.correct_split_distance(conn, session_id, split_index=2, new_distance_km=0.3)
+
+    stored_samples = {s["elapsed_s"]: s for s in db.get_samples(conn, session_id)}
+
+    # Before the corrected lap: untouched.
+    assert stored_samples[90.0]["distance_km"] == pytest.approx(0.18)
+    assert stored_samples[90.0]["speed_m_s"] == pytest.approx(2.0)
+
+    # Within the corrected lap: distance rescaled from the cum_before anchor, speed scaled by 1.5x.
+    assert stored_samples[100.0]["distance_km"] == pytest.approx(0.21)
+    assert stored_samples[100.0]["speed_m_s"] == pytest.approx(3.0)
+    assert stored_samples[190.0]["distance_km"] == pytest.approx(0.48)
+    assert stored_samples[190.0]["speed_m_s"] == pytest.approx(3.0)
+
+    # After the corrected lap: shifted by a constant +0.10km offset, speed untouched.
+    assert stored_samples[200.0]["distance_km"] == pytest.approx(0.5)
+    assert stored_samples[200.0]["speed_m_s"] == pytest.approx(2.0)
+    assert stored_samples[300.0]["distance_km"] == pytest.approx(0.7)
+    assert stored_samples[300.0]["speed_m_s"] == pytest.approx(2.0)
+
+    corrected_split = db.get_splits(conn, session_id)[1]
+    assert corrected_split["distance_km"] == pytest.approx(0.3)
+    assert corrected_split["avg_pace_min_per_km"] == pytest.approx((100 / 60) / 0.3)
+
+    # Other splits are untouched.
+    assert db.get_splits(conn, session_id)[0]["distance_km"] == pytest.approx(0.2)
+    assert db.get_splits(conn, session_id)[2]["distance_km"] == pytest.approx(0.2)
+
+
+def test_correct_split_distance_backs_up_first(conn):
+    summary = make_summary()
+    session_id = db.insert_session(conn, summary, file_hash="backup-check", session_type="run")
+    db.insert_splits(conn, session_id, [SplitSummary(1, 0.68, 360.0, 8.8, 130)])
+    db.insert_samples(conn, session_id, [Sample(0.0, 0.0, 1.9, 130, 80.0, 0.0)])
+
+    db_path = db.get_db_path(conn)
+    backup_dir = db_path.parent / "backups"
+
+    db.correct_split_distance(conn, session_id, split_index=1, new_distance_km=1.0)
+
+    assert list(backup_dir.glob(f"{db_path.stem}_*.db"))
+
+
+def test_correct_split_distance_rejects_unknown_split(conn):
+    summary = make_summary()
+    session_id = db.insert_session(conn, summary, file_hash="unknown-split", session_type="run")
+    db.insert_splits(conn, session_id, [SplitSummary(1, 1.0, 300.0, 5.0, 140)])
+
+    with pytest.raises(ValueError):
+        db.correct_split_distance(conn, session_id, split_index=99, new_distance_km=1.0)
+
+
+def test_correct_split_distance_rejects_split_with_no_distance(conn):
+    summary = make_summary()
+    session_id = db.insert_session(conn, summary, file_hash="no-distance", session_type="run")
+    db.insert_splits(conn, session_id, [SplitSummary(1, None, 300.0, None, 140)])
+
+    with pytest.raises(ValueError):
+        db.correct_split_distance(conn, session_id, split_index=1, new_distance_km=1.0)
+
+
 def test_deleting_session_cascades_to_splits_and_samples(conn):
     summary = make_summary()
     session_id = db.insert_session(conn, summary, file_hash="cascade", session_type="run")
