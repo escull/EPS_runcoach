@@ -10,12 +10,14 @@ Built for one person's own training data, on their own machine. Nothing is uploa
 
 - **Import** FIT files exported from a Suunto watch (or dropped into a watched inbox folder), with duplicate detection and automatic backups.
 - **Sessions** table — sortable, at a glance: date, type, duration, distance, pace, heart rate.
-- **Session detail** — splits, time-in-heart-rate-zones, pace and heart-rate charts, and your own notes.
+- **Session detail** — splits, time-in-heart-rate-zones, pace and heart-rate charts, your own notes, and (with a compatible heart rate monitor like a Polar H10) estimated VO2 max, recovery time and training effect.
+- **Correct a split's distance** — fix a lap's distance when a treadmill's own distance estimate was badly miscalibrated; its pace and the pace chart recalculate properly, with the correction backed up automatically.
 - **How did it go?** — log effort (RPE), free-text notes, and niggles (with body location, side and severity) after any session.
 - **Dashboard** — estimated 5k time vs your goal, fitness/fatigue/form trend, weekly distance and training load, and aerobic efficiency over time.
 - **Niggles tracking** — severity-over-time chart per body location, so a nagging ache doesn't sneak up on you.
+- **Body** — log your weight over time with a trend chart, plus a height setting; both feed into the AI coach's context.
 - **AI Insights** — ask an AI coach for a review of everything since it last checked in: what changed, what to do next, and a history of past check-ins. Manually invoked, not automatic — nothing gets sent anywhere without you asking for it.
-- **Settings** — inbox folder, heart rate zones, 5k goal, AI coach model and API key, database backups, and a full CSV export of your data.
+- **Settings** — inbox folder, heart rate zones, height, 5k goal, AI coach model and API key, database backups, and a full CSV export of your data.
 
 ## Privacy
 
@@ -39,6 +41,7 @@ Built for one person's own training data, on their own machine. Nothing is uploa
 
 ![Session detail - stats, notes, coach's advice, splits](docs/screenshots/session_detail_1.png)
 ![Session detail - heart rate chart](docs/screenshots/session_detail_2.png)
+![Correcting a split's distance](docs/screenshots/correct_split_distance.png)
 
 </details>
 
@@ -55,6 +58,13 @@ Built for one person's own training data, on their own machine. Nothing is uploa
 
 ![Niggles page](docs/screenshots/niggles.png)
 ![AI Insights page](docs/screenshots/ai_insights.png)
+
+</details>
+
+<details>
+<summary>Body</summary>
+
+![Body page - weight trend and log](docs/screenshots/body.png)
 
 </details>
 
@@ -127,9 +137,7 @@ Currently **Windows only**. The core logic and UI (tkinter/ttkbootstrap/matplotl
 
 Not built yet, in no particular order:
 
-- [ ] Weight tracking
 - [ ] Body fat % tracking
-- [ ] Height tracking
 - [ ] Others (TBD)
 
 See `RunCoach_Build_Plan.md` for the fuller nice-to-haves list.

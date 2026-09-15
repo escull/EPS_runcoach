@@ -23,7 +23,7 @@ class CorrectSplitDistanceDialog(tb.Toplevel):
         splits: list[sqlite3.Row],
         on_done: Callable[[], None] | None = None,
     ):
-        super().__init__(title="Correct a split's distance", size=(420, 220))
+        super().__init__(title="Correct a split's distance", size=(480, 280))
         self.app = app
         self.session_id = session_id
         self.splits = [s for s in splits if s["distance_km"]]
@@ -35,7 +35,7 @@ class CorrectSplitDistanceDialog(tb.Toplevel):
 
         split_row = tb.Frame(self)
         split_row.pack(fill="x", padx=16, pady=4)
-        tb.Label(split_row, text="Split:", width=14, anchor="w").pack(side="left")
+        tb.Label(split_row, text="Split:", width=20, anchor="w").pack(side="left")
         split_labels = [f"{s['split_index']} - currently {format_distance(s['distance_km'])}" for s in self.splits]
         self.split_var = tk.StringVar(value=split_labels[0] if split_labels else "")
         tb.Combobox(
@@ -44,7 +44,7 @@ class CorrectSplitDistanceDialog(tb.Toplevel):
 
         distance_row = tb.Frame(self)
         distance_row.pack(fill="x", padx=16, pady=4)
-        tb.Label(distance_row, text="True distance (km):", width=14, anchor="w").pack(side="left")
+        tb.Label(distance_row, text="True distance (km):", width=20, anchor="w").pack(side="left")
         self.distance_var = tk.StringVar()
         tb.Entry(distance_row, textvariable=self.distance_var, width=10).pack(side="left", padx=8)
 

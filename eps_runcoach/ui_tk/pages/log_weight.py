@@ -16,7 +16,7 @@ from eps_runcoach.core.formatting import parse_ddmmyyyy_to_iso_date
 
 class LogWeightDialog(tb.Toplevel):
     def __init__(self, app, on_done: Callable[[], None] | None = None):
-        super().__init__(title="Log weight", size=(360, 220))
+        super().__init__(title="Log weight", size=(380, 280))
         self.app = app
         self.on_done = on_done
 
