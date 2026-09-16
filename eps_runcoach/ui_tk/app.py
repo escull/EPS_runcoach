@@ -14,6 +14,7 @@ import ttkbootstrap as tb
 from eps_runcoach.core import app_paths, db
 from eps_runcoach.core.coach.base import CoachError
 from eps_runcoach.core.coach.request import request_insights as run_insights_request
+from eps_runcoach.core.coach.request import request_question as run_question_request
 from eps_runcoach.core.coach.request import request_review
 from eps_runcoach.core.error_log import log_exception
 from eps_runcoach.ui_tk.pages.ai_insights import AIInsightsPage
@@ -109,6 +110,12 @@ class App(tb.Window):
         everything since it was last consulted (the AI Insights page).
         """
         self._run_coach_task(lambda conn: run_insights_request(conn), on_done)
+
+    def request_question(self, question: str, on_done: Callable[[], None] | None = None) -> None:
+        """Ask the AI coach a one-off question (the AI Insights page's
+        question box).
+        """
+        self._run_coach_task(lambda conn: run_question_request(conn, question), on_done)
 
     def _run_coach_task(self, work: Callable[[sqlite3.Connection], str], on_done: Callable[[], None] | None) -> None:
         """Run a coach request in a background thread using its own

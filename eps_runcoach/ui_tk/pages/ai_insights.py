@@ -52,7 +52,22 @@ class AIInsightsPage(tb.Frame):
         )
         self.get_insights_button.pack(anchor="w", padx=16, pady=8)
 
-        tb.Label(body, text="Latest", font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=16, pady=(8, 0))
+        tb.Label(body, text="Ask a question", font=("Segoe UI", 12, "bold")).pack(
+            anchor="w", padx=16, pady=(8, 0)
+        )
+        question_row = tb.Frame(body)
+        question_row.pack(fill="x", padx=16, pady=(4, 0))
+        self.question_var = tk.StringVar()
+        question_entry = tb.Entry(question_row, textvariable=self.question_var)
+        question_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        question_entry.bind("<Return>", lambda _e: self._ask_question())
+        self.ask_button = tb.Button(question_row, text="Ask", command=self._ask_question, bootstyle="primary")
+        self.ask_button.pack(side="left")
+
+        self.question_status_label = tb.Label(body, text="", bootstyle="danger")
+        self.question_status_label.pack(anchor="w", padx=16, pady=(4, 0))
+
+        tb.Label(body, text="Latest", font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=16, pady=(16, 0))
         self.latest_frame = tb.Frame(body)
         self.latest_frame.pack(fill="x", padx=16, pady=(4, 16))
 
@@ -103,4 +118,21 @@ class AIInsightsPage(tb.Frame):
         if not self.winfo_exists():
             return
         self.get_insights_button.configure(state="normal", text="Get coach's insights")
+        self.refresh()
+
+    def _ask_question(self) -> None:
+        question = self.question_var.get().strip()
+        if not question:
+            self.question_status_label.configure(text="Type a question first.")
+            return
+
+        self.question_status_label.configure(text="")
+        self.ask_button.configure(state="disabled", text="Asking...")
+        self.app.request_question(question, on_done=self._on_question_done)
+
+    def _on_question_done(self) -> None:
+        if not self.winfo_exists():
+            return
+        self.ask_button.configure(state="normal", text="Ask")
+        self.question_var.set("")
         self.refresh()

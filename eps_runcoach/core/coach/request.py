@@ -20,10 +20,15 @@ from eps_runcoach.core.coach.context import build_context
 from eps_runcoach.core.coach.gemini import GeminiProvider
 
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
+QUESTION_SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt_question.md"
 
 
 def _load_system_prompt() -> str:
     return SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def _load_question_system_prompt() -> str:
+    return QUESTION_SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
 
 
 def _get_model(conn: sqlite3.Connection) -> str:
@@ -84,5 +89,36 @@ def request_insights(
     review_text = provider.generate_review(context, system_prompt)
 
     most_recent_session_id = sessions[0]["id"]  # get_all_sessions orders newest first
+    db.insert_ai_review(conn, most_recent_session_id, provider=provider_name, model=model, review_text=review_text)
+    return review_text
+
+
+def request_question(
+    conn: sqlite3.Connection,
+    question: str,
+    provider: CoachProvider | None = None,
+    provider_name: str = "gemini",
+) -> str:
+    """Ask the coach a one-off question, using the same compact training
+    context as a review so it can answer with actual knowledge of recent
+    training. Saved against the most recent session, like insights, since
+    a question isn't tied to one specific session. Raises a CoachError if
+    there are no sessions yet, or on any provider failure.
+    """
+    sessions = db.get_all_sessions(conn)
+    if not sessions:
+        raise CoachError("Import some sessions before asking the coach a question.")
+
+    model = _get_model(conn)
+    if provider is None:
+        provider = GeminiProvider(model)
+
+    context = build_context(conn)
+    context_with_question = f"{context}\n\n=== My question ===\n{question}"
+    system_prompt = _load_question_system_prompt()
+    answer_text = provider.generate_review(context_with_question, system_prompt)
+
+    review_text = f"Q: {question}\n\n{answer_text}"
+    most_recent_session_id = sessions[0]["id"]
     db.insert_ai_review(conn, most_recent_session_id, provider=provider_name, model=model, review_text=review_text)
     return review_text

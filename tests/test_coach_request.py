@@ -4,7 +4,7 @@ import pytest
 
 from eps_runcoach.core import db
 from eps_runcoach.core.coach.base import CoachConnectionError, CoachError, CoachProvider
-from eps_runcoach.core.coach.request import request_insights, request_review
+from eps_runcoach.core.coach.request import request_insights, request_question, request_review
 from eps_runcoach.core.fit_import import SessionSummary
 
 
@@ -107,3 +107,40 @@ def test_request_insights_uses_since_last_review_as_the_window(tmp_path):
     request_insights(conn, provider=fake)
 
     assert "since" in fake.received_context.lower()
+
+
+def test_request_question_requires_at_least_one_session(tmp_path):
+    conn = db.get_connection(tmp_path / "test.db")
+    fake = FakeProvider(response="shouldn't be called")
+
+    with pytest.raises(CoachError):
+        request_question(conn, "What should I eat before a long run?", provider=fake)
+
+    assert fake.received_context is None
+
+
+def test_request_question_includes_the_question_in_context_and_saved_answer(tmp_path):
+    conn = db.get_connection(tmp_path / "test.db")
+    session_id = db.insert_session(conn, make_summary(), file_hash="a", session_type="run")
+    fake = FakeProvider(response="Have a small carb-heavy snack an hour or two before.")
+
+    result = request_question(conn, "What should I eat before a long run?", provider=fake)
+
+    assert "What should I eat before a long run?" in fake.received_context
+    assert "pain" in fake.received_system_prompt.lower()  # the question-specific prompt, still safety-conscious
+    assert result.startswith("Q: What should I eat before a long run?")
+    assert "Have a small carb-heavy snack" in result
+
+    saved = db.get_latest_ai_review_for_session(conn, session_id)
+    assert saved["review_text"] == result
+
+
+def test_request_question_propagates_error_and_saves_nothing(tmp_path):
+    conn = db.get_connection(tmp_path / "test.db")
+    session_id = db.insert_session(conn, make_summary(), file_hash="a", session_type="run")
+    fake = FakeProvider(error=CoachConnectionError("no internet"))
+
+    with pytest.raises(CoachConnectionError):
+        request_question(conn, "Any tips for hills?", provider=fake)
+
+    assert db.get_latest_ai_review_for_session(conn, session_id) is None

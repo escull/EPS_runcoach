@@ -16,7 +16,7 @@ Built for one person's own training data, on their own machine. Nothing is uploa
 - **Dashboard** — estimated 5k time vs your goal, fitness/fatigue/form trend, weekly distance and training load, and aerobic efficiency over time.
 - **Niggles tracking** — severity-over-time chart per body location, so a nagging ache doesn't sneak up on you.
 - **Body** — log your weight over time with a trend chart, plus a height setting; both feed into the AI coach's context.
-- **AI Insights** — ask an AI coach for a review of everything since it last checked in: what changed, what to do next, and a history of past check-ins. Manually invoked, not automatic — nothing gets sent anywhere without you asking for it.
+- **AI Insights** — ask an AI coach for a review of everything since it last checked in: what changed, what to do next, and a history of past check-ins. Also has a free-text box for one-off questions (e.g. "what should I eat before a long run?"), answered using the same training context. Manually invoked, not automatic — nothing gets sent anywhere without you asking for it.
 - **Settings** — inbox folder, heart rate zones, height, 5k goal, AI coach model and API key, database backups, and a full CSV export of your data.
 
 ## Privacy
